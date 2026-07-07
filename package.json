@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "test": "tsx --test src/modules/valuation/service.test.ts",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate"
@@ -22,6 +23,7 @@
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "prisma": "^6.11.1",
+    "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   }
 }

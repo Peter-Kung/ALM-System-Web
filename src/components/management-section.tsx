@@ -8,6 +8,8 @@ import {
 } from "@prisma/client";
 import { FormEvent, useEffect, useState } from "react";
 
+import { ValuationManager } from "@/components/valuation-manager";
+
 type AccountRecord = {
   id: string;
   name: string;
@@ -210,6 +212,10 @@ export function ManagementSection({ section }: SectionProps) {
 
   if (section === "prices") {
     return <PricesManager />;
+  }
+
+  if (section === "valuation") {
+    return <ValuationManager />;
   }
 
   return (
