@@ -3,3 +3,4 @@ export const pricesModule = {
 };
 
 export { createPriceRecordRepository } from "./repository";
+export { refreshAutoPriceRecordsForUser } from "./service";

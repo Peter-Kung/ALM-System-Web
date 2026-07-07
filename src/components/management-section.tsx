@@ -58,6 +58,35 @@ type LiabilityRecord = {
   paymentAccount: Pick<AccountRecord, "id" | "name" | "institutionName"> | null;
 };
 
+type PriceRecord = {
+  id: string;
+  assetId: string;
+  sourceType: "AUTO_REFRESH" | "MANUAL_ENTRY";
+  currency: string;
+  price: string;
+  recordedAt: string;
+  isValid: boolean;
+  asset: Pick<AssetRecord, "id" | "name" | "symbol" | "currency" | "priceSourceType">;
+};
+
+type PriceRefreshResult = {
+  refreshed: Array<{
+    assetId: string;
+    assetName: string;
+    symbol: string;
+    priceRecordId: string;
+    price: string;
+    currency: string;
+    recordedAt: string;
+  }>;
+  failed: Array<{
+    assetId: string;
+    assetName: string;
+    symbol: string | null;
+    reason: string;
+  }>;
+};
+
 type SectionProps = {
   section: string;
 };
@@ -105,6 +134,13 @@ type LiabilityFormState = {
   notes: string;
 };
 
+type ManualPriceFormState = {
+  assetId: string;
+  currency: string;
+  price: string;
+  isValid: boolean;
+};
+
 const emptyAccountForm: AccountFormState = {
   name: "",
   institutionName: "",
@@ -148,6 +184,13 @@ const emptyLiabilityForm: LiabilityFormState = {
   notes: "",
 };
 
+const emptyManualPriceForm: ManualPriceFormState = {
+  assetId: "",
+  currency: "",
+  price: "",
+  isValid: true,
+};
+
 export function ManagementSection({ section }: SectionProps) {
   if (section === "accounts") {
     return <AccountsManager />;
@@ -163,6 +206,10 @@ export function ManagementSection({ section }: SectionProps) {
 
   if (section === "liabilities") {
     return <LiabilitiesManager />;
+  }
+
+  if (section === "prices") {
+    return <PricesManager />;
   }
 
   return (
@@ -1279,12 +1326,386 @@ function LiabilitiesManager() {
   );
 }
 
+function PricesManager() {
+  const [assets, setAssets] = useState<AssetRecord[]>([]);
+  const [priceRecords, setPriceRecords] = useState<PriceRecord[]>([]);
+  const [manualForm, setManualForm] = useState<ManualPriceFormState>(emptyManualPriceForm);
+  const [refreshResult, setRefreshResult] = useState<PriceRefreshResult | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSavingManualPrice, setIsSavingManualPrice] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  async function loadData() {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const [assetsResponse, pricesResponse] = await Promise.all([
+        fetch("/api/assets"),
+        fetch("/api/prices"),
+      ]);
+
+      const [assetsPayload, pricesPayload] = (await Promise.all([
+        assetsResponse.json(),
+        pricesResponse.json(),
+      ])) as [
+        { assets?: AssetRecord[]; error?: string },
+        { priceRecords?: PriceRecord[]; error?: string },
+      ];
+
+      if (!assetsResponse.ok) {
+        throw new Error(assetsPayload.error ?? "Failed to load assets.");
+      }
+
+      if (!pricesResponse.ok) {
+        throw new Error(pricesPayload.error ?? "Failed to load prices.");
+      }
+
+      const nextAssets = assetsPayload.assets ?? [];
+      const nextPriceRecords = pricesPayload.priceRecords ?? [];
+      const nextManualAssets = nextAssets.filter(
+        (asset) => asset.isActive && asset.priceSourceType === AssetPriceSourceType.MANUAL,
+      );
+
+      setAssets(nextAssets);
+      setPriceRecords(nextPriceRecords);
+      setManualForm((currentForm) => ({
+        ...currentForm,
+        assetId:
+          nextManualAssets.find((asset) => asset.id === currentForm.assetId)?.id ??
+          nextManualAssets[0]?.id ??
+          "",
+        currency:
+          nextManualAssets.find((asset) => asset.id === currentForm.assetId)?.currency ??
+          nextManualAssets[0]?.currency ??
+          "",
+      }));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load prices.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleManualSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSavingManualPrice(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/prices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...manualForm,
+          price: manualForm.price,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        priceRecord?: PriceRecord;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.priceRecord) {
+        throw new Error(payload.error ?? "Failed to save price record.");
+      }
+
+      const nextPriceRecord = payload.priceRecord;
+      setPriceRecords((currentRecords) =>
+        mergeLatestPriceRecord(currentRecords, nextPriceRecord),
+      );
+
+      const selectedAsset = manualAssets.find((asset) => asset.id === manualForm.assetId);
+
+      setManualForm({
+        assetId: selectedAsset?.id ?? manualAssets[0]?.id ?? "",
+        currency: selectedAsset?.currency ?? manualAssets[0]?.currency ?? "",
+        price: "",
+        isValid: true,
+      });
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Failed to save price record.",
+      );
+    } finally {
+      setIsSavingManualPrice(false);
+    }
+  }
+
+  async function handleRefresh() {
+    setIsRefreshing(true);
+    setError(null);
+    setRefreshResult(null);
+
+    try {
+      const response = await fetch("/api/prices/refresh", { method: "POST" });
+      const payload = (await response.json()) as PriceRefreshResult & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to refresh prices.");
+      }
+
+      setRefreshResult(payload);
+      if (payload.refreshed.length > 0) {
+        await loadData();
+      }
+    } catch (refreshError) {
+      setError(refreshError instanceof Error ? refreshError.message : "Failed to refresh prices.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  const manualAssets = assets.filter(
+    (asset) => asset.isActive && asset.priceSourceType === AssetPriceSourceType.MANUAL,
+  );
+  const autoAssets = assets.filter(
+    (asset) => asset.isActive && asset.priceSourceType === AssetPriceSourceType.AUTO,
+  );
+  const latestPriceByAssetId = new Map(
+    priceRecords.map((priceRecord) => [priceRecord.assetId, priceRecord] as const),
+  );
+  const selectedManualAsset =
+    manualAssets.find((asset) => asset.id === manualForm.assetId) ?? manualAssets[0] ?? null;
+
+  return (
+    <section className="stack">
+      <div className="hero stack">
+        <p className="eyebrow">Price records</p>
+        <h1>Prices</h1>
+        <p className="muted">
+          Refresh market prices for auto-priced assets and record manual fund prices
+          without leaving the authenticated workspace.
+        </p>
+      </div>
+      <div className="management-grid">
+        <div className="stack">
+          <div className="card stack">
+            <div className="section-heading">
+              <div>
+                <h2>Automatic refresh</h2>
+                <p className="muted">
+                  Fetch the latest quote for each active auto-priced asset.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="ghost-button compact-button"
+                onClick={() => void handleRefresh()}
+                disabled={isRefreshing || autoAssets.length === 0}
+              >
+                {isRefreshing ? "Refreshing..." : "Refresh prices"}
+              </button>
+            </div>
+            {autoAssets.length === 0 ? (
+              <div className="placeholder">
+                No active auto-priced assets are available for refresh yet.
+              </div>
+            ) : null}
+            {refreshResult ? (
+              <div className="stack">
+                <p className="muted">
+                  Updated {refreshResult.refreshed.length} assets. Failed on{" "}
+                  {refreshResult.failed.length}.
+                </p>
+                {refreshResult.refreshed.map((entry) => (
+                  <article key={entry.priceRecordId} className="resource-card stack">
+                    <div className="section-heading">
+                      <div>
+                        <h3>{entry.assetName}</h3>
+                        <p className="muted">{entry.symbol}</p>
+                      </div>
+                      <strong>
+                        {entry.price} {entry.currency}
+                      </strong>
+                    </div>
+                    <p className="muted">Recorded at {formatDateTime(entry.recordedAt)}</p>
+                  </article>
+                ))}
+                {refreshResult.failed.map((entry) => (
+                  <article key={entry.assetId} className="resource-card stack">
+                    <div>
+                      <h3>{entry.assetName}</h3>
+                      <p className="muted">
+                        {entry.symbol ? `${entry.symbol} · ` : ""}
+                        {entry.reason}
+                      </p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <form className="card stack" onSubmit={handleManualSubmit}>
+            <div className="section-heading">
+              <div>
+                <h2>Manual entry</h2>
+                <p className="muted">
+                  Save the latest operator-supplied price for manually priced assets.
+                </p>
+              </div>
+            </div>
+            <label className="field">
+              <span>Asset</span>
+              <select
+                value={manualForm.assetId}
+                onChange={(event) => {
+                  const asset = manualAssets.find((candidate) => candidate.id === event.target.value);
+                  setManualForm({
+                    ...manualForm,
+                    assetId: event.target.value,
+                    currency: asset?.currency ?? manualForm.currency,
+                  });
+                }}
+                disabled={manualAssets.length === 0}
+              >
+                {manualAssets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.name}
+                    {asset.symbol ? ` · ${asset.symbol}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="field-row">
+              <label className="field">
+                <span>Currency</span>
+                <input
+                  value={manualForm.currency}
+                  onChange={(event) =>
+                    setManualForm({ ...manualForm, currency: event.target.value })
+                  }
+                  disabled={manualAssets.length === 0}
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>Price</span>
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0.0001"
+                  value={manualForm.price}
+                  onChange={(event) =>
+                    setManualForm({ ...manualForm, price: event.target.value })
+                  }
+                  disabled={manualAssets.length === 0}
+                  required
+                />
+              </label>
+            </div>
+            <label className="toggle-field">
+              <input
+                type="checkbox"
+                checked={manualForm.isValid}
+                onChange={(event) =>
+                  setManualForm({ ...manualForm, isValid: event.target.checked })
+                }
+                disabled={manualAssets.length === 0}
+              />
+              <span>Mark this price record as valid</span>
+            </label>
+            {manualAssets.length === 0 ? (
+              <div className="placeholder">
+                Add an active asset with `Manual` pricing before saving price records.
+              </div>
+            ) : null}
+            <button type="submit" disabled={isSavingManualPrice || manualAssets.length === 0}>
+              {isSavingManualPrice ? "Saving..." : "Save manual price"}
+            </button>
+          </form>
+          {error ? <p className="error">{error}</p> : null}
+        </div>
+        <div className="stack">
+          <div className="section-heading">
+            <h2>Latest price status</h2>
+            <p className="muted">{assets.length} asset records</p>
+          </div>
+          {isLoading ? <div className="placeholder">Loading prices...</div> : null}
+          {!isLoading && assets.length === 0 ? (
+            <div className="placeholder">No assets yet. Create assets before pricing them.</div>
+          ) : null}
+          {!isLoading
+            ? assets.map((asset) => {
+                const latestPrice = latestPriceByAssetId.get(asset.id);
+
+                return (
+                  <article key={asset.id} className="resource-card stack">
+                    <div className="section-heading">
+                      <div>
+                        <h3>{asset.name}</h3>
+                        <p className="muted">
+                          {formatEnumLabel(asset.priceSourceType)}
+                          {asset.symbol ? ` · ${asset.symbol}` : ""}
+                        </p>
+                      </div>
+                      <span>{asset.isActive ? "Active" : "Inactive"}</span>
+                    </div>
+                    {latestPrice ? (
+                      <dl className="detail-grid">
+                        <div>
+                          <dt>Latest price</dt>
+                          <dd>
+                            {latestPrice.price} {latestPrice.currency}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Recorded</dt>
+                          <dd>{formatDateTime(latestPrice.recordedAt)}</dd>
+                        </div>
+                        <div>
+                          <dt>Source</dt>
+                          <dd>{formatEnumLabel(latestPrice.sourceType)}</dd>
+                        </div>
+                        <div>
+                          <dt>Validity</dt>
+                          <dd>{latestPrice.isValid ? "Valid" : "Invalid"}</dd>
+                        </div>
+                      </dl>
+                    ) : (
+                      <div className="placeholder">
+                        No saved price record yet for this asset.
+                      </div>
+                    )}
+                    {selectedManualAsset?.id === asset.id ? (
+                      <p className="muted">
+                        Manual entry defaults to this asset&apos;s configured currency.
+                      </p>
+                    ) : null}
+                  </article>
+                );
+              })
+            : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function toDateInputValue(value: string | null) {
   if (!value) {
     return "";
   }
 
   return value.slice(0, 10);
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  });
+}
+
+function mergeLatestPriceRecord(currentRecords: PriceRecord[], nextRecord: PriceRecord) {
+  return [nextRecord, ...currentRecords.filter((record) => record.assetId !== nextRecord.assetId)];
 }
 
 function formatEnumLabel(value: string) {
