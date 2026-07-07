@@ -7,9 +7,260 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AccountType {
+  CASH
+  BANK
+  BROKERAGE
+  OTHER
+}
+
+enum AssetType {
+  STOCK
+  ETF
+  FUND
+  CASH_EQUIVALENT
+  OTHER
+}
+
+enum AssetPriceSourceType {
+  AUTO
+  MANUAL
+}
+
+enum LiabilityType {
+  MORTGAGE
+  PERSONAL_LOAN
+  OTHER
+}
+
+enum PriceRecordSourceType {
+  AUTO_REFRESH
+  MANUAL_ENTRY
+}
+
+enum SnapshotStatus {
+  COMPLETE
+  INCOMPLETE
+}
+
+enum SnapshotIssueSeverity {
+  INFO
+  WARNING
+  ERROR
+}
+
+enum SnapshotIssueType {
+  MISSING_PRICE
+  MISSING_FX_RATE
+  INVALID_PRICE
+  INVALID_BALANCE
+  DATA_GAP
+  OTHER
+}
+
+enum SnapshotEntityType {
+  ACCOUNT
+  ASSET
+  HOLDING
+  LIABILITY
+  PRICE_RECORD
+  SNAPSHOT
+  SYSTEM
+}
+
 model User {
+  id          String      @id @default(cuid())
+  username    String      @unique
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  accounts    Account[]
+  assets      Asset[]
+  liabilities Liability[]
+  snapshots   Snapshot[]
+}
+
+model Account {
+  id                 String      @id @default(cuid())
+  userId             String
+  name               String
+  institutionName    String
+  accountType        AccountType
+  currency           String
+  cashBalance        Decimal     @default(0)
+  isActive           Boolean     @default(true)
+  notes              String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings           Holding[]
+  paymentLiabilities Liability[] @relation("LiabilityPaymentAccount")
+
+  @@index([userId, accountType])
+}
+
+model Asset {
+  id              String               @id @default(cuid())
+  userId          String
+  name            String
+  assetType       AssetType
+  symbol          String?
+  currency        String
+  priceSourceType AssetPriceSourceType
+  isActive        Boolean              @default(true)
+  notes           String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings        Holding[]
+  priceRecords    PriceRecord[]
+
+  @@index([userId, assetType])
+  @@index([symbol])
+}
+
+model Holding {
   id        String   @id @default(cuid())
-  username  String   @unique
+  accountId String
+  assetId   String
+  quantity  Decimal
+  isActive  Boolean  @default(true)
+  notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, assetId])
+  @@index([assetId])
+}
+
+model Liability {
+  id               String        @id @default(cuid())
+  userId           String
+  name             String
+  liabilityType    LiabilityType
+  currency         String
+  originalAmount   Decimal
+  currentBalance   Decimal
+  interestRate     Decimal
+  monthlyPayment   Decimal
+  startDate        DateTime
+  endDate          DateTime?
+  paymentAccountId String?
+  isActive         Boolean       @default(true)
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentAccount   Account?      @relation("LiabilityPaymentAccount", fields: [paymentAccountId], references: [id], onDelete: SetNull)
+
+  @@index([userId, liabilityType])
+  @@index([paymentAccountId])
+}
+
+model PriceRecord {
+  id         String                @id @default(cuid())
+  assetId    String
+  sourceType PriceRecordSourceType
+  currency   String
+  price      Decimal
+  recordedAt DateTime
+  isValid    Boolean               @default(true)
+  createdAt  DateTime              @default(now())
+  asset      Asset                 @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, recordedAt(sort: Desc)])
+}
+
+model Snapshot {
+  id                      String              @id @default(cuid())
+  userId                  String
+  status                  SnapshotStatus
+  baseCurrency            String
+  totalAssets             Decimal
+  totalLiabilities        Decimal
+  netWorth                Decimal
+  cashPosition            Decimal
+  investmentValue         Decimal
+  monthlyDebtPaymentTotal Decimal
+  snapshotAt              DateTime
+  createdAt               DateTime            @default(now())
+  user                    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts                SnapshotAccount[]
+  holdings                SnapshotHolding[]
+  liabilities             SnapshotLiability[]
+  issues                  SnapshotIssue[]
+
+  @@index([userId, snapshotAt(sort: Desc)])
+}
+
+model SnapshotAccount {
+  id              String      @id @default(cuid())
+  snapshotId      String
+  sourceAccountId String?
+  accountName     String
+  institutionName String
+  accountType     AccountType
+  currency        String
+  cashBalance     Decimal
+  holdingsValue   Decimal
+  totalValue      Decimal
+  snapshot        Snapshot    @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@index([sourceAccountId])
+}
+
+model SnapshotHolding {
+  id              String    @id @default(cuid())
+  snapshotId      String
+  sourceHoldingId String?
+  sourceAccountId String?
+  sourceAssetId   String?
+  accountName     String
+  assetName       String
+  assetType       AssetType
+  symbol          String?
+  quantity        Decimal
+  assetCurrency   String
+  priceAmount     Decimal
+  priceCurrency   String
+  fxRateToBase    Decimal
+  marketValue     Decimal
+  snapshot        Snapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@index([sourceHoldingId])
+}
+
+model SnapshotLiability {
+  id                  String        @id @default(cuid())
+  snapshotId          String
+  sourceLiabilityId   String?
+  liabilityName       String
+  liabilityType       LiabilityType
+  currency            String
+  currentBalance      Decimal
+  monthlyPayment      Decimal
+  fxRateToBase        Decimal
+  balanceValue        Decimal
+  monthlyPaymentValue Decimal
+  paymentAccountName  String?
+  snapshot            Snapshot      @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@index([sourceLiabilityId])
+}
+
+model SnapshotIssue {
+  id                 String                @id @default(cuid())
+  snapshotId         String
+  severity           SnapshotIssueSeverity
+  issueType          SnapshotIssueType
+  affectedEntityType SnapshotEntityType
+  affectedEntityId   String?
+  message            String
+  snapshot           Snapshot              @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId, severity])
 }
