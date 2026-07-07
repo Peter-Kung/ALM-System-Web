@@ -39,7 +39,10 @@ export function createLiabilityRepository(db: PrismaExecutor = prisma) {
           }
         }
 
-        return executor.liability.create({ data });
+        return executor.liability.create({
+          data,
+          include: { paymentAccount: true },
+        });
       });
     },
     findById(id: string) {
@@ -53,6 +56,94 @@ export function createLiabilityRepository(db: PrismaExecutor = prisma) {
         where: { userId },
         include: { paymentAccount: true },
         orderBy: { createdAt: "asc" },
+      });
+    },
+    async update(id: string, data: Prisma.LiabilityUncheckedUpdateInput, expectedUserId: string) {
+      if (typeof data.name === "string") {
+        assertNonEmptyString(data.name, "name");
+      }
+
+      if (typeof data.currency === "string") {
+        assertNonEmptyString(data.currency, "currency");
+      }
+
+      if (data.originalAmount !== undefined) {
+        assertNonNegative(data.originalAmount, "originalAmount");
+      }
+
+      if (data.currentBalance !== undefined) {
+        assertNonNegative(data.currentBalance, "currentBalance");
+      }
+
+      if (data.interestRate !== undefined) {
+        assertNonNegative(data.interestRate, "interestRate");
+      }
+
+      if (data.monthlyPayment !== undefined) {
+        assertNonNegative(data.monthlyPayment, "monthlyPayment");
+      }
+
+      return withWriteValidation(db, async (executor) => {
+        const existingLiability = await executor.liability.findUnique({
+          where: { id },
+          select: {
+            userId: true,
+            startDate: true,
+            endDate: true,
+            paymentAccountId: true,
+          },
+        });
+
+        if (!existingLiability) {
+          throw new RepositoryValidationError("Liability not found.");
+        }
+
+        if (existingLiability.userId !== expectedUserId) {
+          throw new RepositoryValidationError(
+            "Liability must belong to the authenticated user.",
+          );
+        }
+
+        const startDate =
+          data.startDate instanceof Date ? data.startDate : existingLiability.startDate;
+        const endDate =
+          data.endDate === null
+            ? null
+            : data.endDate instanceof Date
+              ? data.endDate
+              : existingLiability.endDate;
+
+        assertDateOrder(startDate, endDate, "startDate", "endDate");
+
+        const paymentAccountId =
+          data.paymentAccountId === null
+            ? null
+            : typeof data.paymentAccountId === "string"
+              ? data.paymentAccountId
+              : existingLiability.paymentAccountId;
+
+        if (paymentAccountId) {
+          const paymentAccount = await executor.account.findUnique({
+            where: { id: paymentAccountId },
+            select: { userId: true },
+          });
+
+          if (!paymentAccount) {
+            throw new RepositoryValidationError("Payment account not found.");
+          }
+
+          if (paymentAccount.userId !== existingLiability.userId) {
+            throw new RepositoryValidationError(
+              "Liability payment account must belong to the same user.",
+            );
+          }
+        }
+
+        return executor.liability.update({
+          where: { id },
+          data,
+          include: { paymentAccount: true },
+        });
       });
     },
   };

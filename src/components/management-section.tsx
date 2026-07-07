@@ -1,6 +1,11 @@
 "use client";
 
-import { AccountType, AssetPriceSourceType, AssetType } from "@prisma/client";
+import {
+  AccountType,
+  AssetPriceSourceType,
+  AssetType,
+  LiabilityType,
+} from "@prisma/client";
 import { FormEvent, useEffect, useState } from "react";
 
 type AccountRecord = {
@@ -36,6 +41,23 @@ type HoldingRecord = {
   asset: Pick<AssetRecord, "id" | "name" | "symbol" | "assetType">;
 };
 
+type LiabilityRecord = {
+  id: string;
+  name: string;
+  liabilityType: LiabilityType;
+  currency: string;
+  originalAmount: string;
+  currentBalance: string;
+  interestRate: string;
+  monthlyPayment: string;
+  startDate: string;
+  endDate: string | null;
+  paymentAccountId: string | null;
+  isActive: boolean;
+  notes: string | null;
+  paymentAccount: Pick<AccountRecord, "id" | "name" | "institutionName"> | null;
+};
+
 type SectionProps = {
   section: string;
 };
@@ -68,6 +90,21 @@ type HoldingFormState = {
   notes: string;
 };
 
+type LiabilityFormState = {
+  name: string;
+  liabilityType: LiabilityType;
+  currency: string;
+  originalAmount: string;
+  currentBalance: string;
+  interestRate: string;
+  monthlyPayment: string;
+  startDate: string;
+  endDate: string;
+  paymentAccountId: string;
+  isActive: boolean;
+  notes: string;
+};
+
 const emptyAccountForm: AccountFormState = {
   name: "",
   institutionName: "",
@@ -96,6 +133,21 @@ const emptyHoldingForm: HoldingFormState = {
   notes: "",
 };
 
+const emptyLiabilityForm: LiabilityFormState = {
+  name: "",
+  liabilityType: LiabilityType.MORTGAGE,
+  currency: "TWD",
+  originalAmount: "0",
+  currentBalance: "0",
+  interestRate: "0",
+  monthlyPayment: "0",
+  startDate: "",
+  endDate: "",
+  paymentAccountId: "",
+  isActive: true,
+  notes: "",
+};
+
 export function ManagementSection({ section }: SectionProps) {
   if (section === "accounts") {
     return <AccountsManager />;
@@ -107,6 +159,10 @@ export function ManagementSection({ section }: SectionProps) {
 
   if (section === "holdings") {
     return <HoldingsManager />;
+  }
+
+  if (section === "liabilities") {
+    return <LiabilitiesManager />;
   }
 
   return (
@@ -862,6 +918,373 @@ function HoldingsManager() {
       </div>
     </section>
   );
+}
+
+function LiabilitiesManager() {
+  const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+  const [liabilities, setLiabilities] = useState<LiabilityRecord[]>([]);
+  const [form, setForm] = useState<LiabilityFormState>(emptyLiabilityForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  async function loadData() {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const [accountsResponse, liabilitiesResponse] = await Promise.all([
+        fetch("/api/accounts"),
+        fetch("/api/liabilities"),
+      ]);
+
+      const [accountsPayload, liabilitiesPayload] = (await Promise.all([
+        accountsResponse.json(),
+        liabilitiesResponse.json(),
+      ])) as [
+        { accounts?: AccountRecord[]; error?: string },
+        { liabilities?: LiabilityRecord[]; error?: string },
+      ];
+
+      if (!accountsResponse.ok) {
+        throw new Error(accountsPayload.error ?? "Failed to load accounts.");
+      }
+
+      if (!liabilitiesResponse.ok) {
+        throw new Error(liabilitiesPayload.error ?? "Failed to load liabilities.");
+      }
+
+      setAccounts(accountsPayload.accounts ?? []);
+      setLiabilities(liabilitiesPayload.liabilities ?? []);
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load liabilities.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        editingId ? `/api/liabilities/${editingId}` : "/api/liabilities",
+        {
+          method: editingId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        },
+      );
+
+      const payload = (await response.json()) as {
+        liability?: LiabilityRecord;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.liability) {
+        throw new Error(payload.error ?? "Failed to save liability.");
+      }
+
+      const nextLiability = payload.liability;
+
+      setLiabilities((currentLiabilities) =>
+        editingId
+          ? currentLiabilities.map((liability) =>
+              liability.id === nextLiability.id ? nextLiability : liability,
+            )
+          : [...currentLiabilities, nextLiability],
+      );
+      reset();
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Failed to save liability.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function beginEdit(liability: LiabilityRecord) {
+    setEditingId(liability.id);
+    setForm({
+      name: liability.name,
+      liabilityType: liability.liabilityType,
+      currency: liability.currency,
+      originalAmount: liability.originalAmount,
+      currentBalance: liability.currentBalance,
+      interestRate: liability.interestRate,
+      monthlyPayment: liability.monthlyPayment,
+      startDate: toDateInputValue(liability.startDate),
+      endDate: toDateInputValue(liability.endDate),
+      paymentAccountId: liability.paymentAccountId ?? "",
+      isActive: liability.isActive,
+      notes: liability.notes ?? "",
+    });
+  }
+
+  function reset() {
+    setEditingId(null);
+    setForm(emptyLiabilityForm);
+  }
+
+  return (
+    <section className="stack">
+      <div className="hero stack">
+        <p className="eyebrow">Liability management</p>
+        <h1>Liabilities</h1>
+        <p className="muted">
+          Maintain mortgages and personal loans with balances, payment pressure,
+          and optional payment-account links.
+        </p>
+      </div>
+      <div className="management-grid">
+        <form className="card stack" onSubmit={handleSubmit}>
+          <div className="section-heading">
+            <h2>{editingId ? "Edit liability" : "Add liability"}</h2>
+            {editingId ? (
+              <button type="button" className="ghost-button compact-button" onClick={reset}>
+                Cancel
+              </button>
+            ) : null}
+          </div>
+          <label className="field">
+            <span>Name</span>
+            <input
+              value={form.name}
+              onChange={(event) => setForm({ ...form, name: event.target.value })}
+              required
+            />
+          </label>
+          <div className="field-row">
+            <label className="field">
+              <span>Liability type</span>
+              <select
+                value={form.liabilityType}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    liabilityType: event.target.value as LiabilityType,
+                  })
+                }
+              >
+                {Object.values(LiabilityType).map((liabilityType) => (
+                  <option key={liabilityType} value={liabilityType}>
+                    {formatEnumLabel(liabilityType)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Currency</span>
+              <input
+                value={form.currency}
+                onChange={(event) => setForm({ ...form, currency: event.target.value })}
+                required
+              />
+            </label>
+          </div>
+          <div className="field-row">
+            <label className="field">
+              <span>Original amount</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.originalAmount}
+                onChange={(event) =>
+                  setForm({ ...form, originalAmount: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Current balance</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.currentBalance}
+                onChange={(event) =>
+                  setForm({ ...form, currentBalance: event.target.value })
+                }
+                required
+              />
+            </label>
+          </div>
+          <div className="field-row">
+            <label className="field">
+              <span>Interest rate</span>
+              <input
+                type="number"
+                step="0.0001"
+                min="0"
+                value={form.interestRate}
+                onChange={(event) =>
+                  setForm({ ...form, interestRate: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Monthly payment</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.monthlyPayment}
+                onChange={(event) =>
+                  setForm({ ...form, monthlyPayment: event.target.value })
+                }
+                required
+              />
+            </label>
+          </div>
+          <div className="field-row">
+            <label className="field">
+              <span>Start date</span>
+              <input
+                type="date"
+                value={form.startDate}
+                onChange={(event) => setForm({ ...form, startDate: event.target.value })}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>End date</span>
+              <input
+                type="date"
+                value={form.endDate}
+                onChange={(event) => setForm({ ...form, endDate: event.target.value })}
+              />
+            </label>
+          </div>
+          <label className="field">
+            <span>Payment account</span>
+            <select
+              value={form.paymentAccountId}
+              onChange={(event) =>
+                setForm({ ...form, paymentAccountId: event.target.value })
+              }
+            >
+              <option value="">No payment account</option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} · {account.institutionName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Notes</span>
+            <textarea
+              value={form.notes}
+              onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              rows={4}
+            />
+          </label>
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+            />
+            <span>Active liability</span>
+          </label>
+          {error ? <p className="error">{error}</p> : null}
+          <button type="submit" disabled={isSaving}>
+            {isSaving ? "Saving..." : editingId ? "Save liability" : "Create liability"}
+          </button>
+        </form>
+        <div className="stack">
+          <div className="section-heading">
+            <h2>Existing liabilities</h2>
+            <p className="muted">{liabilities.length} liability records</p>
+          </div>
+          {isLoading ? <div className="placeholder">Loading liabilities...</div> : null}
+          {!isLoading && liabilities.length === 0 ? (
+            <div className="placeholder">No liabilities yet. Create the first liability.</div>
+          ) : null}
+          {liabilities.map((liability) => (
+            <article key={liability.id} className="resource-card stack">
+              <div className="section-heading">
+                <div>
+                  <h3>{liability.name}</h3>
+                  <p className="muted">
+                    {formatEnumLabel(liability.liabilityType)}
+                    {liability.paymentAccount
+                      ? ` · ${liability.paymentAccount.name}`
+                      : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ghost-button compact-button"
+                  onClick={() => beginEdit(liability)}
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="detail-grid">
+                <div>
+                  <dt>Current balance</dt>
+                  <dd>{liability.currentBalance}</dd>
+                </div>
+                <div>
+                  <dt>Monthly payment</dt>
+                  <dd>{liability.monthlyPayment}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{liability.isActive ? "Active" : "Inactive"}</dd>
+                </div>
+                <div>
+                  <dt>Interest rate</dt>
+                  <dd>{liability.interestRate}</dd>
+                </div>
+                <div>
+                  <dt>Schedule</dt>
+                  <dd>
+                    {toDateInputValue(liability.startDate)}
+                    {liability.endDate
+                      ? ` to ${toDateInputValue(liability.endDate)}`
+                      : ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Payment account</dt>
+                  <dd>
+                    {liability.paymentAccount
+                      ? `${liability.paymentAccount.name} · ${liability.paymentAccount.institutionName}`
+                      : "None"}
+                  </dd>
+                </div>
+              </dl>
+              {liability.notes ? <p className="muted">{liability.notes}</p> : null}
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function toDateInputValue(value: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return value.slice(0, 10);
 }
 
 function formatEnumLabel(value: string) {
