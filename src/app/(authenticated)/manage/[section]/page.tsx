@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { ManagementSection } from "@/components/management-section";
 import { managementSections } from "@/lib/navigation";
 
 export default async function ManagementSectionPage({
@@ -13,15 +14,5 @@ export default async function ManagementSectionPage({
     notFound();
   }
 
-  return (
-    <section className="stack">
-      <div className="hero stack">
-        <p className="eyebrow">Module scaffold</p>
-        <h1>{section[0].toUpperCase() + section.slice(1)}</h1>
-        <p className="muted">
-          This protected page is reserved for the {section} domain workflow.
-        </p>
-      </div>
-    </section>
-  );
+  return <ManagementSection section={section} />;
 }

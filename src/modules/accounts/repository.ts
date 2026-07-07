@@ -30,5 +30,27 @@ export function createAccountRepository(db: PrismaExecutor = prisma) {
         orderBy: { createdAt: "asc" },
       });
     },
+    update(id: string, data: Prisma.AccountUncheckedUpdateInput) {
+      if (typeof data.name === "string") {
+        assertNonEmptyString(data.name, "name");
+      }
+
+      if (typeof data.institutionName === "string") {
+        assertNonEmptyString(data.institutionName, "institutionName");
+      }
+
+      if (typeof data.currency === "string") {
+        assertNonEmptyString(data.currency, "currency");
+      }
+
+      if (data.cashBalance !== undefined) {
+        assertNonNegative(data.cashBalance, "cashBalance");
+      }
+
+      return db.account.update({
+        where: { id },
+        data,
+      });
+    },
   };
 }

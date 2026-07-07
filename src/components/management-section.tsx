@@ -1,0 +1,873 @@
+"use client";
+
+import { AccountType, AssetPriceSourceType, AssetType } from "@prisma/client";
+import { FormEvent, useEffect, useState } from "react";
+
+type AccountRecord = {
+  id: string;
+  name: string;
+  institutionName: string;
+  accountType: AccountType;
+  currency: string;
+  cashBalance: string;
+  isActive: boolean;
+  notes: string | null;
+};
+
+type AssetRecord = {
+  id: string;
+  name: string;
+  assetType: AssetType;
+  symbol: string | null;
+  currency: string;
+  priceSourceType: AssetPriceSourceType;
+  isActive: boolean;
+  notes: string | null;
+};
+
+type HoldingRecord = {
+  id: string;
+  accountId: string;
+  assetId: string;
+  quantity: string;
+  isActive: boolean;
+  notes: string | null;
+  account: Pick<AccountRecord, "id" | "name" | "institutionName">;
+  asset: Pick<AssetRecord, "id" | "name" | "symbol" | "assetType">;
+};
+
+type SectionProps = {
+  section: string;
+};
+
+type AccountFormState = {
+  name: string;
+  institutionName: string;
+  accountType: AccountType;
+  currency: string;
+  cashBalance: string;
+  isActive: boolean;
+  notes: string;
+};
+
+type AssetFormState = {
+  name: string;
+  assetType: AssetType;
+  symbol: string;
+  currency: string;
+  priceSourceType: AssetPriceSourceType;
+  isActive: boolean;
+  notes: string;
+};
+
+type HoldingFormState = {
+  accountId: string;
+  assetId: string;
+  quantity: string;
+  isActive: boolean;
+  notes: string;
+};
+
+const emptyAccountForm: AccountFormState = {
+  name: "",
+  institutionName: "",
+  accountType: AccountType.BANK,
+  currency: "TWD",
+  cashBalance: "0",
+  isActive: true,
+  notes: "",
+};
+
+const emptyAssetForm: AssetFormState = {
+  name: "",
+  assetType: AssetType.STOCK,
+  symbol: "",
+  currency: "TWD",
+  priceSourceType: AssetPriceSourceType.AUTO,
+  isActive: true,
+  notes: "",
+};
+
+const emptyHoldingForm: HoldingFormState = {
+  accountId: "",
+  assetId: "",
+  quantity: "0",
+  isActive: true,
+  notes: "",
+};
+
+export function ManagementSection({ section }: SectionProps) {
+  if (section === "accounts") {
+    return <AccountsManager />;
+  }
+
+  if (section === "assets") {
+    return <AssetsManager />;
+  }
+
+  if (section === "holdings") {
+    return <HoldingsManager />;
+  }
+
+  return (
+    <section className="stack">
+      <div className="hero stack">
+        <p className="eyebrow">Module scaffold</p>
+        <h1>{section[0].toUpperCase() + section.slice(1)}</h1>
+        <p className="muted">
+          This protected page is reserved for the {section} domain workflow.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function AccountsManager() {
+  const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+  const [form, setForm] = useState<AccountFormState>(emptyAccountForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadAccounts();
+  }, []);
+
+  async function loadAccounts() {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/accounts");
+      const payload = (await response.json()) as { accounts?: AccountRecord[]; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to load accounts.");
+      }
+
+      setAccounts(payload.accounts ?? []);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load accounts.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        editingId ? `/api/accounts/${editingId}` : "/api/accounts",
+        {
+          method: editingId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...form,
+          }),
+        },
+      );
+
+      const payload = (await response.json()) as {
+        account?: AccountRecord;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.account) {
+        throw new Error(payload.error ?? "Failed to save account.");
+      }
+
+      const nextAccount = payload.account;
+
+      setAccounts((currentAccounts) =>
+        editingId
+          ? currentAccounts.map((account) =>
+              account.id === nextAccount.id ? nextAccount : account,
+            )
+          : [...currentAccounts, nextAccount],
+      );
+      reset();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save account.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function beginEdit(account: AccountRecord) {
+    setEditingId(account.id);
+    setForm({
+      name: account.name,
+      institutionName: account.institutionName,
+      accountType: account.accountType,
+      currency: account.currency,
+      cashBalance: account.cashBalance,
+      isActive: account.isActive,
+      notes: account.notes ?? "",
+    });
+  }
+
+  function reset() {
+    setEditingId(null);
+    setForm(emptyAccountForm);
+  }
+
+  return (
+    <section className="stack">
+      <div className="hero stack">
+        <p className="eyebrow">Account management</p>
+        <h1>Accounts</h1>
+        <p className="muted">
+          Maintain cash, bank, and brokerage accounts with current balances and
+          active status.
+        </p>
+      </div>
+      <div className="management-grid">
+        <form className="card stack" onSubmit={handleSubmit}>
+          <div className="section-heading">
+            <h2>{editingId ? "Edit account" : "Add account"}</h2>
+            {editingId ? (
+              <button type="button" className="ghost-button compact-button" onClick={reset}>
+                Cancel
+              </button>
+            ) : null}
+          </div>
+          <label className="field">
+            <span>Name</span>
+            <input
+              value={form.name}
+              onChange={(event) => setForm({ ...form, name: event.target.value })}
+              required
+            />
+          </label>
+          <label className="field">
+            <span>Institution</span>
+            <input
+              value={form.institutionName}
+              onChange={(event) =>
+                setForm({ ...form, institutionName: event.target.value })
+              }
+              required
+            />
+          </label>
+          <div className="field-row">
+            <label className="field">
+              <span>Account type</span>
+              <select
+                value={form.accountType}
+                onChange={(event) =>
+                  setForm({ ...form, accountType: event.target.value as AccountType })
+                }
+              >
+                {Object.values(AccountType).map((accountType) => (
+                  <option key={accountType} value={accountType}>
+                    {formatEnumLabel(accountType)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Currency</span>
+              <input
+                value={form.currency}
+                onChange={(event) => setForm({ ...form, currency: event.target.value })}
+                required
+              />
+            </label>
+          </div>
+          <label className="field">
+            <span>Cash balance</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.cashBalance}
+              onChange={(event) => setForm({ ...form, cashBalance: event.target.value })}
+              required
+            />
+          </label>
+          <label className="field">
+            <span>Notes</span>
+            <textarea
+              value={form.notes}
+              onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              rows={4}
+            />
+          </label>
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+            />
+            <span>Active account</span>
+          </label>
+          {error ? <p className="error">{error}</p> : null}
+          <button type="submit" disabled={isSaving}>
+            {isSaving ? "Saving..." : editingId ? "Save account" : "Create account"}
+          </button>
+        </form>
+        <div className="stack">
+          <div className="section-heading">
+            <h2>Existing accounts</h2>
+            <p className="muted">{accounts.length} account records</p>
+          </div>
+          {isLoading ? <div className="placeholder">Loading accounts...</div> : null}
+          {!isLoading && accounts.length === 0 ? (
+            <div className="placeholder">No accounts yet. Create the first account.</div>
+          ) : null}
+          {accounts.map((account) => (
+            <article key={account.id} className="resource-card stack">
+              <div className="section-heading">
+                <div>
+                  <h3>{account.name}</h3>
+                  <p className="muted">
+                    {account.institutionName} · {formatEnumLabel(account.accountType)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ghost-button compact-button"
+                  onClick={() => beginEdit(account)}
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="detail-grid">
+                <div>
+                  <dt>Currency</dt>
+                  <dd>{account.currency}</dd>
+                </div>
+                <div>
+                  <dt>Cash balance</dt>
+                  <dd>{account.cashBalance}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{account.isActive ? "Active" : "Inactive"}</dd>
+                </div>
+              </dl>
+              {account.notes ? <p className="muted">{account.notes}</p> : null}
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AssetsManager() {
+  const [assets, setAssets] = useState<AssetRecord[]>([]);
+  const [form, setForm] = useState<AssetFormState>(emptyAssetForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadAssets();
+  }, []);
+
+  async function loadAssets() {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/assets");
+      const payload = (await response.json()) as { assets?: AssetRecord[]; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to load assets.");
+      }
+
+      setAssets(payload.assets ?? []);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load assets.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(editingId ? `/api/assets/${editingId}` : "/api/assets", {
+        method: editingId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      const payload = (await response.json()) as { asset?: AssetRecord; error?: string };
+
+      if (!response.ok || !payload.asset) {
+        throw new Error(payload.error ?? "Failed to save asset.");
+      }
+
+      const nextAsset = payload.asset;
+
+      setAssets((currentAssets) =>
+        editingId
+          ? currentAssets.map((asset) => (asset.id === nextAsset.id ? nextAsset : asset))
+          : [...currentAssets, nextAsset],
+      );
+      reset();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save asset.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function beginEdit(asset: AssetRecord) {
+    setEditingId(asset.id);
+    setForm({
+      name: asset.name,
+      assetType: asset.assetType,
+      symbol: asset.symbol ?? "",
+      currency: asset.currency,
+      priceSourceType: asset.priceSourceType,
+      isActive: asset.isActive,
+      notes: asset.notes ?? "",
+    });
+  }
+
+  function reset() {
+    setEditingId(null);
+    setForm(emptyAssetForm);
+  }
+
+  return (
+    <section className="stack">
+      <div className="hero stack">
+        <p className="eyebrow">Asset management</p>
+        <h1>Assets</h1>
+        <p className="muted">
+          Define instruments once, then reuse them across holdings and pricing
+          workflows.
+        </p>
+      </div>
+      <div className="management-grid">
+        <form className="card stack" onSubmit={handleSubmit}>
+          <div className="section-heading">
+            <h2>{editingId ? "Edit asset" : "Add asset"}</h2>
+            {editingId ? (
+              <button type="button" className="ghost-button compact-button" onClick={reset}>
+                Cancel
+              </button>
+            ) : null}
+          </div>
+          <label className="field">
+            <span>Name</span>
+            <input
+              value={form.name}
+              onChange={(event) => setForm({ ...form, name: event.target.value })}
+              required
+            />
+          </label>
+          <div className="field-row">
+            <label className="field">
+              <span>Asset type</span>
+              <select
+                value={form.assetType}
+                onChange={(event) =>
+                  setForm({ ...form, assetType: event.target.value as AssetType })
+                }
+              >
+                {Object.values(AssetType).map((assetType) => (
+                  <option key={assetType} value={assetType}>
+                    {formatEnumLabel(assetType)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Currency</span>
+              <input
+                value={form.currency}
+                onChange={(event) => setForm({ ...form, currency: event.target.value })}
+                required
+              />
+            </label>
+          </div>
+          <div className="field-row">
+            <label className="field">
+              <span>Symbol</span>
+              <input
+                value={form.symbol}
+                onChange={(event) => setForm({ ...form, symbol: event.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>Price source</span>
+              <select
+                value={form.priceSourceType}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    priceSourceType: event.target.value as AssetPriceSourceType,
+                  })
+                }
+              >
+                {Object.values(AssetPriceSourceType).map((priceSourceType) => (
+                  <option key={priceSourceType} value={priceSourceType}>
+                    {formatEnumLabel(priceSourceType)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="field">
+            <span>Notes</span>
+            <textarea
+              value={form.notes}
+              onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              rows={4}
+            />
+          </label>
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+            />
+            <span>Active asset</span>
+          </label>
+          {error ? <p className="error">{error}</p> : null}
+          <button type="submit" disabled={isSaving}>
+            {isSaving ? "Saving..." : editingId ? "Save asset" : "Create asset"}
+          </button>
+        </form>
+        <div className="stack">
+          <div className="section-heading">
+            <h2>Existing assets</h2>
+            <p className="muted">{assets.length} asset records</p>
+          </div>
+          {isLoading ? <div className="placeholder">Loading assets...</div> : null}
+          {!isLoading && assets.length === 0 ? (
+            <div className="placeholder">No assets yet. Create the first asset.</div>
+          ) : null}
+          {assets.map((asset) => (
+            <article key={asset.id} className="resource-card stack">
+              <div className="section-heading">
+                <div>
+                  <h3>{asset.name}</h3>
+                  <p className="muted">
+                    {formatEnumLabel(asset.assetType)}
+                    {asset.symbol ? ` · ${asset.symbol}` : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ghost-button compact-button"
+                  onClick={() => beginEdit(asset)}
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="detail-grid">
+                <div>
+                  <dt>Currency</dt>
+                  <dd>{asset.currency}</dd>
+                </div>
+                <div>
+                  <dt>Pricing</dt>
+                  <dd>{formatEnumLabel(asset.priceSourceType)}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{asset.isActive ? "Active" : "Inactive"}</dd>
+                </div>
+              </dl>
+              {asset.notes ? <p className="muted">{asset.notes}</p> : null}
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HoldingsManager() {
+  const [accounts, setAccounts] = useState<AccountRecord[]>([]);
+  const [assets, setAssets] = useState<AssetRecord[]>([]);
+  const [holdings, setHoldings] = useState<HoldingRecord[]>([]);
+  const [form, setForm] = useState<HoldingFormState>(emptyHoldingForm);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  async function loadData() {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const [accountsResponse, assetsResponse, holdingsResponse] = await Promise.all([
+        fetch("/api/accounts"),
+        fetch("/api/assets"),
+        fetch("/api/holdings"),
+      ]);
+
+      const [accountsPayload, assetsPayload, holdingsPayload] = (await Promise.all([
+        accountsResponse.json(),
+        assetsResponse.json(),
+        holdingsResponse.json(),
+      ])) as [
+        { accounts?: AccountRecord[]; error?: string },
+        { assets?: AssetRecord[]; error?: string },
+        { holdings?: HoldingRecord[]; error?: string },
+      ];
+
+      if (!accountsResponse.ok) {
+        throw new Error(accountsPayload.error ?? "Failed to load accounts.");
+      }
+
+      if (!assetsResponse.ok) {
+        throw new Error(assetsPayload.error ?? "Failed to load assets.");
+      }
+
+      if (!holdingsResponse.ok) {
+        throw new Error(holdingsPayload.error ?? "Failed to load holdings.");
+      }
+
+      const nextAccounts = accountsPayload.accounts ?? [];
+      const nextAssets = assetsPayload.assets ?? [];
+
+      setAccounts(nextAccounts);
+      setAssets(nextAssets);
+      setHoldings(holdingsPayload.holdings ?? []);
+      setForm((currentForm) => ({
+        ...currentForm,
+        accountId: currentForm.accountId || nextAccounts[0]?.id || "",
+        assetId: currentForm.assetId || nextAssets[0]?.id || "",
+      }));
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error ? loadError.message : "Failed to load holdings.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        editingId ? `/api/holdings/${editingId}` : "/api/holdings",
+        {
+          method: editingId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...form,
+          }),
+        },
+      );
+
+      const payload = (await response.json()) as { holding?: HoldingRecord; error?: string };
+
+      if (!response.ok || !payload.holding) {
+        throw new Error(payload.error ?? "Failed to save holding.");
+      }
+
+      const nextHolding = {
+        ...payload.holding,
+        account: accounts.find((account) => account.id === payload.holding?.accountId) ?? payload.holding.account,
+        asset: assets.find((asset) => asset.id === payload.holding?.assetId) ?? payload.holding.asset,
+      };
+
+      setHoldings((currentHoldings) =>
+        editingId
+          ? currentHoldings.map((holding) =>
+              holding.id === nextHolding.id ? nextHolding : holding,
+            )
+          : [...currentHoldings, nextHolding],
+      );
+      reset();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Failed to save holding.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function beginEdit(holding: HoldingRecord) {
+    setEditingId(holding.id);
+    setForm({
+      accountId: holding.accountId,
+      assetId: holding.assetId,
+      quantity: holding.quantity,
+      isActive: holding.isActive,
+      notes: holding.notes ?? "",
+    });
+  }
+
+  function reset() {
+    setEditingId(null);
+    setForm({
+      ...emptyHoldingForm,
+      accountId: accounts[0]?.id ?? "",
+      assetId: assets[0]?.id ?? "",
+    });
+  }
+
+  const canManageHoldings = accounts.length > 0 && assets.length > 0;
+
+  return (
+    <section className="stack">
+      <div className="hero stack">
+        <p className="eyebrow">Holding management</p>
+        <h1>Holdings</h1>
+        <p className="muted">
+          Link assets to accounts and maintain position quantities without
+          duplicating the asset definition.
+        </p>
+      </div>
+      <div className="management-grid">
+        <form className="card stack" onSubmit={handleSubmit}>
+          <div className="section-heading">
+            <h2>{editingId ? "Edit holding" : "Add holding"}</h2>
+            {editingId ? (
+              <button type="button" className="ghost-button compact-button" onClick={reset}>
+                Cancel
+              </button>
+            ) : null}
+          </div>
+          <label className="field">
+            <span>Account</span>
+            <select
+              value={form.accountId}
+              onChange={(event) => setForm({ ...form, accountId: event.target.value })}
+              disabled={!canManageHoldings}
+            >
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} · {account.institutionName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Asset</span>
+            <select
+              value={form.assetId}
+              onChange={(event) => setForm({ ...form, assetId: event.target.value })}
+              disabled={!canManageHoldings}
+            >
+              {assets.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {asset.name}
+                  {asset.symbol ? ` · ${asset.symbol}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Quantity</span>
+            <input
+              type="number"
+              step="0.0001"
+              min="0.0001"
+              value={form.quantity}
+              onChange={(event) => setForm({ ...form, quantity: event.target.value })}
+              disabled={!canManageHoldings}
+              required
+            />
+          </label>
+          <label className="field">
+            <span>Notes</span>
+            <textarea
+              value={form.notes}
+              onChange={(event) => setForm({ ...form, notes: event.target.value })}
+              rows={4}
+              disabled={!canManageHoldings}
+            />
+          </label>
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+              disabled={!canManageHoldings}
+            />
+            <span>Active holding</span>
+          </label>
+          {!canManageHoldings ? (
+            <p className="muted">
+              Create at least one account and one asset before adding holdings.
+            </p>
+          ) : null}
+          {error ? <p className="error">{error}</p> : null}
+          <button type="submit" disabled={isSaving || !canManageHoldings}>
+            {isSaving ? "Saving..." : editingId ? "Save holding" : "Create holding"}
+          </button>
+        </form>
+        <div className="stack">
+          <div className="section-heading">
+            <h2>Existing holdings</h2>
+            <p className="muted">{holdings.length} holding records</p>
+          </div>
+          {isLoading ? <div className="placeholder">Loading holdings...</div> : null}
+          {!isLoading && holdings.length === 0 ? (
+            <div className="placeholder">No holdings yet. Create the first holding.</div>
+          ) : null}
+          {holdings.map((holding) => (
+            <article key={holding.id} className="resource-card stack">
+              <div className="section-heading">
+                <div>
+                  <h3>{holding.asset.name}</h3>
+                  <p className="muted">
+                    {holding.account.name} · {holding.account.institutionName}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ghost-button compact-button"
+                  onClick={() => beginEdit(holding)}
+                >
+                  Edit
+                </button>
+              </div>
+              <dl className="detail-grid">
+                <div>
+                  <dt>Quantity</dt>
+                  <dd>{holding.quantity}</dd>
+                </div>
+                <div>
+                  <dt>Asset type</dt>
+                  <dd>{formatEnumLabel(holding.asset.assetType)}</dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>{holding.isActive ? "Active" : "Inactive"}</dd>
+                </div>
+              </dl>
+              {holding.notes ? <p className="muted">{holding.notes}</p> : null}
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function formatEnumLabel(value: string) {
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}

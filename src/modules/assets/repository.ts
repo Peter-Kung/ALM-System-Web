@@ -25,5 +25,19 @@ export function createAssetRepository(db: PrismaExecutor = prisma) {
         orderBy: { createdAt: "asc" },
       });
     },
+    update(id: string, data: Prisma.AssetUncheckedUpdateInput) {
+      if (typeof data.name === "string") {
+        assertNonEmptyString(data.name, "name");
+      }
+
+      if (typeof data.currency === "string") {
+        assertNonEmptyString(data.currency, "currency");
+      }
+
+      return db.asset.update({
+        where: { id },
+        data,
+      });
+    },
   };
 }
