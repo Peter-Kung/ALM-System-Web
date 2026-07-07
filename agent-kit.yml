@@ -1,0 +1,32 @@
+tracker:
+  type: github-projects
+  repo:
+    url: https://github.com/Peter-Kung/ALM-System-Web
+  project:
+    url: https://github.com/users/Peter-Kung/projects/6
+
+fields:
+  type:
+    name: Type
+    values:
+      epic: Epic
+      story: Story
+      bug: Bug
+      task: Task
+  status:
+    name: Status
+    values:
+      todo: Todo
+      in_progress: In Progress
+      blocked: Blocked
+      done: Done
+
+labels:
+  agent: agent
+  review: review
+  needs_breakdown: needs-breakdown
+  investigation: investigation
+
+docs:
+  source_of_truth:
+    - docs/
