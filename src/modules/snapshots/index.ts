@@ -3,3 +3,9 @@ export const snapshotsModule = {
 };
 
 export { createSnapshotRepository } from "./repository";
+export {
+  buildSnapshotCreateInput,
+  confirmSnapshotFromPreviewInput,
+  createSnapshotPreviewHash,
+} from "./service";
+export { createSnapshotPreviewToken, readSnapshotPreviewToken } from "./token";

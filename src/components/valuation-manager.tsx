@@ -13,6 +13,8 @@ export function ValuationManager() {
   const [preview, setPreview] = useState<ValuationPreviewResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,6 +61,7 @@ export function ValuationManager() {
     event.preventDefault();
     setIsPreviewing(true);
     setError(null);
+    setConfirmationMessage(null);
 
     try {
       const response = await fetch("/api/valuation/preview", {
@@ -90,6 +93,60 @@ export function ValuationManager() {
       );
     } finally {
       setIsPreviewing(false);
+    }
+  }
+
+  async function handleConfirmSnapshot() {
+    if (!preview) {
+      return;
+    }
+
+    if (!preview.confirmationToken) {
+      setError("Run a fresh valuation preview before saving a snapshot.");
+      return;
+    }
+
+    setIsConfirming(true);
+    setError(null);
+    setConfirmationMessage(null);
+
+    try {
+      const response = await fetch("/api/snapshots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          confirmationToken: preview.confirmationToken,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        snapshot?: { id: string; status: string; snapshotAt: string };
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to save snapshot.");
+      }
+
+      setConfirmationMessage(
+        `Snapshot saved for ${formatDateTime(payload.snapshot?.snapshotAt ?? preview.generatedAt)} with status ${payload.snapshot?.status ?? preview.status}. Open the Snapshots section to review the immutable detail.`,
+      );
+      setPreview((currentPreview) =>
+        currentPreview
+          ? {
+              ...currentPreview,
+              confirmationToken: undefined,
+            }
+          : currentPreview,
+      );
+    } catch (confirmationError) {
+      setError(
+        confirmationError instanceof Error
+          ? confirmationError.message
+          : "Failed to save snapshot.",
+      );
+    } finally {
+      setIsConfirming(false);
     }
   }
 
@@ -143,8 +200,16 @@ export function ValuationManager() {
               ))
             : null}
           {error ? <p className="error">{error}</p> : null}
+          {confirmationMessage ? <p className="muted">{confirmationMessage}</p> : null}
           <button type="submit" disabled={isLoading || isPreviewing}>
             {isPreviewing ? "Running preview..." : "Run valuation preview"}
+          </button>
+          <button
+            type="button"
+            disabled={!preview || isConfirming || isPreviewing}
+            onClick={() => void handleConfirmSnapshot()}
+          >
+            {isConfirming ? "Saving snapshot..." : "Confirm snapshot"}
           </button>
         </form>
         <div className="stack">

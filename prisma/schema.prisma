@@ -175,6 +175,7 @@ model PriceRecord {
 model Snapshot {
   id                      String              @id @default(cuid())
   userId                  String
+  previewHash             String?
   status                  SnapshotStatus
   baseCurrency            String
   totalAssets             Decimal
@@ -192,6 +193,7 @@ model Snapshot {
   issues                  SnapshotIssue[]
 
   @@index([userId, snapshotAt(sort: Desc)])
+  @@unique([userId, previewHash])
 }
 
 model SnapshotAccount {
@@ -223,9 +225,10 @@ model SnapshotHolding {
   symbol          String?
   quantity        Decimal
   assetCurrency   String
-  priceAmount     Decimal
-  priceCurrency   String
-  fxRateToBase    Decimal
+  priceAmount     Decimal?
+  priceCurrency   String?
+  priceRecordedAt DateTime?
+  fxRateToBase    Decimal?
   marketValue     Decimal
   snapshot        Snapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
 
@@ -242,7 +245,7 @@ model SnapshotLiability {
   currency            String
   currentBalance      Decimal
   monthlyPayment      Decimal
-  fxRateToBase        Decimal
+  fxRateToBase        Decimal?
   balanceValue        Decimal
   monthlyPaymentValue Decimal
   paymentAccountName  String?

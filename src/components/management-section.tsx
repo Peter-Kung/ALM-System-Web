@@ -8,6 +8,7 @@ import {
 } from "@prisma/client";
 import { FormEvent, useEffect, useState } from "react";
 
+import { SnapshotManager } from "@/components/snapshot-manager";
 import { ValuationManager } from "@/components/valuation-manager";
 
 type AccountRecord = {
@@ -216,6 +217,10 @@ export function ManagementSection({ section }: SectionProps) {
 
   if (section === "valuation") {
     return <ValuationManager />;
+  }
+
+  if (section === "snapshots") {
+    return <SnapshotManager />;
   }
 
   return (

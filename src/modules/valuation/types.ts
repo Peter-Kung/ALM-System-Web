@@ -118,4 +118,5 @@ export type ValuationPreviewResult = {
   liabilities: ValuationPreviewLiability[];
   issues: ValuationPreviewIssue[];
   previewInput: ValuationPreviewInput;
+  confirmationToken?: string;
 };

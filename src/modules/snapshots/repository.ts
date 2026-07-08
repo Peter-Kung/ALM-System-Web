@@ -6,6 +6,7 @@ import {
   assertNonEmptyString,
   assertNonNegative,
   assertPositive,
+  RepositoryValidationError,
 } from "@/lib/repository-utils";
 
 const snapshotInclude = {
@@ -95,13 +96,33 @@ function validateSnapshotCreateWithDetailsInput(data: Prisma.SnapshotCreateInput
       holding.assetCurrency,
       "snapshotHolding.assetCurrency",
     );
-    assertNonEmptyString(
-      holding.priceCurrency,
-      "snapshotHolding.priceCurrency",
-    );
     assertPositive(holding.quantity, "snapshotHolding.quantity");
-    assertPositive(holding.priceAmount, "snapshotHolding.priceAmount");
-    assertPositive(holding.fxRateToBase, "snapshotHolding.fxRateToBase");
+    const hasPriceAmount = holding.priceAmount != null;
+    const hasPriceCurrency = Boolean(holding.priceCurrency?.trim());
+    const hasPriceRecordedAt = holding.priceRecordedAt != null;
+
+    if (hasPriceAmount !== hasPriceCurrency || hasPriceAmount !== hasPriceRecordedAt) {
+      throw new RepositoryValidationError(
+        "snapshotHolding priceAmount, priceCurrency, and priceRecordedAt must be provided together.",
+      );
+    }
+
+    if (hasPriceAmount) {
+      assertPositive(holding.priceAmount, "snapshotHolding.priceAmount");
+      assertNonEmptyString(
+        holding.priceCurrency ?? "",
+        "snapshotHolding.priceCurrency",
+      );
+    } else if (holding.fxRateToBase != null) {
+      throw new RepositoryValidationError(
+        "snapshotHolding.fxRateToBase requires price metadata for the saved holding.",
+      );
+    }
+
+    if (holding.fxRateToBase != null) {
+      assertPositive(holding.fxRateToBase, "snapshotHolding.fxRateToBase");
+    }
+
     assertNonNegative(holding.marketValue, "snapshotHolding.marketValue");
   }
 
@@ -122,7 +143,9 @@ function validateSnapshotCreateWithDetailsInput(data: Prisma.SnapshotCreateInput
       liability.monthlyPayment,
       "snapshotLiability.monthlyPayment",
     );
-    assertPositive(liability.fxRateToBase, "snapshotLiability.fxRateToBase");
+    if (liability.fxRateToBase != null) {
+      assertPositive(liability.fxRateToBase, "snapshotLiability.fxRateToBase");
+    }
     assertNonNegative(liability.balanceValue, "snapshotLiability.balanceValue");
     assertNonNegative(
       liability.monthlyPaymentValue,
@@ -156,6 +179,12 @@ export function createSnapshotRepository(db: PrismaExecutor = prisma) {
     findById(id: string) {
       return db.snapshot.findUnique({
         where: { id },
+        include: snapshotInclude,
+      });
+    },
+    findByPreviewHash(userId: string, previewHash: string) {
+      return db.snapshot.findFirst({
+        where: { userId, previewHash },
         include: snapshotInclude,
       });
     },

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { readJsonBody } from "@/lib/api-route";
 import { requireApiSession } from "@/lib/auth/api";
 import { RepositoryValidationError } from "@/lib/repository-utils";
+import { createSnapshotPreviewToken } from "@/modules/snapshots";
 import {
   createValuationContextForUser,
   createValuationPreviewForUser,
@@ -48,8 +49,15 @@ export async function POST(request: NextRequest) {
       session.sub,
       readFxRates(payload),
     );
+    const confirmationToken = await createSnapshotPreviewToken(
+      session.sub,
+      preview.previewInput,
+    );
 
-    return NextResponse.json(preview);
+    return NextResponse.json({
+      ...preview,
+      confirmationToken,
+    });
   } catch (error) {
     if (error instanceof RepositoryValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
