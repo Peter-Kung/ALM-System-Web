@@ -230,6 +230,69 @@ button:disabled {
   grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
 }
 
+.dashboard-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.dashboard-grid-secondary {
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.dashboard-highlight {
+  background:
+    linear-gradient(160deg, rgba(15, 118, 110, 0.14), rgba(255, 255, 255, 0)),
+    var(--panel);
+}
+
+.dashboard-link {
+  width: auto;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.status-complete {
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--accent-strong);
+}
+
+.status-incomplete {
+  background: rgba(180, 35, 24, 0.12);
+  color: #8a2718;
+}
+
+.metric-row {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.metric-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.metric-row p {
+  margin: 0.25rem 0 0;
+}
+
+.issue-note {
+  border-left: 3px solid rgba(180, 35, 24, 0.28);
+  padding-left: 0.9rem;
+  color: var(--muted);
+}
+
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: 1fr;

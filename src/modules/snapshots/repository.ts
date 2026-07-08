@@ -188,11 +188,12 @@ export function createSnapshotRepository(db: PrismaExecutor = prisma) {
         include: snapshotInclude,
       });
     },
-    listByUser(userId: string) {
+    listByUser(userId: string, options?: { take?: number }) {
       return db.snapshot.findMany({
         where: { userId },
         include: snapshotInclude,
         orderBy: [{ snapshotAt: "desc" }, { createdAt: "desc" }],
+        take: options?.take,
       });
     },
   };
