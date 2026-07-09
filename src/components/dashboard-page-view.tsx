@@ -2,6 +2,7 @@ import Link from "next/link";
 import React from "react";
 
 import { DashboardAllocationCard } from "@/components/dashboard-allocation-card";
+import { DashboardTrendCard } from "@/components/dashboard-trend-card";
 import type { DashboardRoute, DashboardSummary } from "@/modules/dashboard/service";
 
 type DashboardPageViewProps = {
@@ -120,6 +121,11 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
 
       <DashboardAllocationCard
         allocation={dashboard.allocation}
+        baseCurrency={snapshot.baseCurrency}
+      />
+
+      <DashboardTrendCard
+        trendSeries={dashboard.trendSeries}
         baseCurrency={snapshot.baseCurrency}
       />
 

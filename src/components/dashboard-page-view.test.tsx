@@ -157,13 +157,18 @@ test("dashboard page view renders summary-first sections and limits reminders to
   assert.match(markup, /25.00%/);
   assert.match(markup, /Reminders/);
   assert.match(markup, /Coverage/);
+  assert.match(markup, /Trend/);
+  assert.match(markup, /Net worth/);
+  assert.match(markup, /Total assets/);
+  assert.match(markup, /Total liabilities/);
+  assert.match(markup, /Jul 1/);
+  assert.match(markup, /Jul 8/);
   assert.match(markup, /The latest snapshot is usable, but reminder items still need follow-up\./);
   assert.match(markup, /4 reminder items recorded in the latest snapshot\./);
   assert.match(markup, /Missing valid price record for Global Fund\./);
   assert.match(markup, /FX rate for USD is stale\./);
   assert.match(markup, /Cash account balance needs refresh\./);
   assert.doesNotMatch(markup, /Older reminder should be hidden\./);
-  assert.doesNotMatch(markup, /Trend summary/);
   assert.doesNotMatch(markup, /Debt balances/);
 });
 
@@ -178,4 +183,32 @@ test("dashboard page view renders a stable allocation fallback when no allocatio
 
   assert.match(markup, /Allocation/);
   assert.match(markup, /No allocation data is available in the latest snapshot\./);
+});
+
+test("dashboard page view hides the trend card when fewer than two snapshots exist", () => {
+  const markup = renderToStaticMarkup(
+    <DashboardPageView
+      dashboard={createDashboardSummary({
+        heroSummary: {
+          snapshotAt: "2026-07-08T00:00:00.000Z",
+          status: SnapshotStatus.COMPLETE,
+          issueCount: 4,
+          hasTrend: false,
+          netWorthDirection: "positive",
+        },
+        trend: null,
+        trendSeries: [
+          {
+            snapshotAt: "2026-07-08T00:00:00.000Z",
+            netWorth: "800.00",
+            totalAssets: "1200.00",
+            totalLiabilities: "400.00",
+          },
+        ],
+      })}
+    />,
+  );
+
+  assert.doesNotMatch(markup, /<h2>Trend<\/h2>/);
+  assert.doesNotMatch(markup, /Saved snapshot history across the latest two or more records\./);
 });
