@@ -9,6 +9,10 @@ test("primary navigation preserves the approved workspace grouping", () => {
     ["Dashboard", "Data", "Workflow"],
   );
 
+  assert.deepEqual(primaryNavigation[0]?.items, [
+    { href: "/dashboard", label: "Dashboard", shortLabel: "01" },
+  ]);
+
   assert.deepEqual(
     primaryNavigation.flatMap((group) => group.items.map((item) => item.href)),
     [

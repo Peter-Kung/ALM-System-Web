@@ -12,7 +12,7 @@ type NavigationGroup = {
 export const primaryNavigation: readonly NavigationGroup[] = [
   {
     heading: "Dashboard",
-    items: [{ href: "/dashboard", label: "Overview", shortLabel: "01" }],
+    items: [{ href: "/dashboard", label: "Dashboard", shortLabel: "01" }],
   },
   {
     heading: "Data",
