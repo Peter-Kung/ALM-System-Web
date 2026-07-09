@@ -61,7 +61,10 @@ function createDashboardSummary(
       ],
       remainingCount: 1,
     },
-    allocation: [{ label: "Stock", value: "900.00", shareOfAssets: "75.00" }],
+    allocation: [
+      { label: "Stock", value: "900.00", shareOfAssets: "75.00" },
+      { label: "Cash", value: "300.00", shareOfAssets: "25.00" },
+    ],
     liabilityBreakdown: [
       { label: "Mortgage", value: "400.00", shareOfAssets: "100.00" },
     ],
@@ -145,6 +148,13 @@ test("dashboard page view renders summary-first sections and limits reminders to
   assert.match(markup, /Total assets/);
   assert.match(markup, /Total liabilities/);
   assert.match(markup, /Cash position/);
+  assert.match(markup, /Allocation/);
+  assert.match(markup, /Stock/);
+  assert.match(markup, /Cash/);
+  assert.match(markup, /TWD 900.00/);
+  assert.match(markup, /TWD 300.00/);
+  assert.match(markup, /75.00%/);
+  assert.match(markup, /25.00%/);
   assert.match(markup, /Reminders/);
   assert.match(markup, /Coverage/);
   assert.match(markup, /The latest snapshot is usable, but reminder items still need follow-up\./);
@@ -153,7 +163,19 @@ test("dashboard page view renders summary-first sections and limits reminders to
   assert.match(markup, /FX rate for USD is stale\./);
   assert.match(markup, /Cash account balance needs refresh\./);
   assert.doesNotMatch(markup, /Older reminder should be hidden\./);
-  assert.doesNotMatch(markup, /Allocation/);
   assert.doesNotMatch(markup, /Trend summary/);
   assert.doesNotMatch(markup, /Debt balances/);
+});
+
+test("dashboard page view renders a stable allocation fallback when no allocation data exists", () => {
+  const markup = renderToStaticMarkup(
+    <DashboardPageView
+      dashboard={createDashboardSummary({
+        allocation: [],
+      })}
+    />,
+  );
+
+  assert.match(markup, /Allocation/);
+  assert.match(markup, /No allocation data is available in the latest snapshot\./);
 });

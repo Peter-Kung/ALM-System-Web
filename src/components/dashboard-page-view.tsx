@@ -1,8 +1,8 @@
 import Link from "next/link";
-import type { Route } from "next";
 import React from "react";
 
-import type { DashboardSummary } from "@/modules/dashboard/service";
+import { DashboardAllocationCard } from "@/components/dashboard-allocation-card";
+import type { DashboardRoute, DashboardSummary } from "@/modules/dashboard/service";
 
 type DashboardPageViewProps = {
   dashboard: DashboardSummary;
@@ -118,6 +118,11 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
         </article>
       </div>
 
+      <DashboardAllocationCard
+        allocation={dashboard.allocation}
+        baseCurrency={snapshot.baseCurrency}
+      />
+
       <div className="dashboard-grid dashboard-grid-secondary">
         <article className="resource-card stack">
           <div className="section-heading">
@@ -175,7 +180,7 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
   );
 }
 
-function DashboardLink({ href, children }: { href: Route; children: string }) {
+function DashboardLink({ href, children }: { href: DashboardRoute; children: string }) {
   return (
     <Link href={href} className="nav-link dashboard-link">
       {children}

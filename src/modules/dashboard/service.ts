@@ -9,11 +9,13 @@ type DashboardSnapshot = Snapshot & {
   issues: SnapshotIssue[];
 };
 
-type DashboardAllocationItem = {
+export type DashboardAllocationItem = {
   label: string;
   value: string;
   shareOfAssets: string;
 };
+
+export type DashboardRoute = "/manage/snapshots" | "/manage/valuation";
 
 export type DashboardSidebarSummary = {
   hasSnapshot: boolean;
@@ -27,7 +29,7 @@ export type DashboardSidebarSummary = {
 };
 
 export type DashboardEmptyState = {
-  actionHref: string;
+  actionHref: DashboardRoute;
 };
 
 export type DashboardHeroSummary = {
