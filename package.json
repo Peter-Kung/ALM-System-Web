@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "test": "tsx --test src/modules/valuation/service.test.ts src/modules/snapshots/service.test.ts src/modules/dashboard/service.test.ts",
+    "test": "tsx --test src/modules/valuation/service.test.ts src/modules/snapshots/service.test.ts src/modules/dashboard/service.test.ts src/lib/navigation.test.ts src/lib/date-format.test.ts src/components/app-shell-frame.test.tsx",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate"

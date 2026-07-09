@@ -1,13 +1,45 @@
-export const appSections = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/manage/accounts", label: "Accounts" },
-  { href: "/manage/assets", label: "Assets" },
-  { href: "/manage/holdings", label: "Holdings" },
-  { href: "/manage/liabilities", label: "Liabilities" },
-  { href: "/manage/prices", label: "Prices" },
-  { href: "/manage/valuation", label: "Valuation" },
-  { href: "/manage/snapshots", label: "Snapshots" },
+type NavigationItem = {
+  href: string;
+  label: string;
+  shortLabel: string;
+};
+
+type NavigationGroup = {
+  heading: string;
+  items: readonly NavigationItem[];
+};
+
+export const primaryNavigation: readonly NavigationGroup[] = [
+  {
+    heading: "Dashboard",
+    items: [{ href: "/dashboard", label: "Overview", shortLabel: "01" }],
+  },
+  {
+    heading: "Data",
+    items: [
+      { href: "/manage/accounts", label: "Accounts", shortLabel: "02" },
+      { href: "/manage/assets", label: "Assets", shortLabel: "03" },
+      { href: "/manage/holdings", label: "Holdings", shortLabel: "04" },
+      { href: "/manage/liabilities", label: "Liabilities", shortLabel: "05" },
+      { href: "/manage/prices", label: "Prices", shortLabel: "06" },
+    ],
+  },
+  {
+    heading: "Workflow",
+    items: [
+      { href: "/manage/valuation", label: "Valuation", shortLabel: "07" },
+      { href: "/manage/snapshots", label: "Snapshots", shortLabel: "08" },
+    ],
+  },
 ] as const;
+
+export const footerNavigation: readonly NavigationItem[] = [
+  { href: "/settings/account", label: "Settings", shortLabel: "09" },
+] as const;
+
+export const appSections: readonly NavigationItem[] = primaryNavigation.flatMap(
+  (group) => group.items,
+);
 
 export const managementSections = new Set(
   appSections
