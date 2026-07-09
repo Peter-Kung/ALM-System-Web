@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { patchAccountStatusForUser } from "@/app/api/accounts/[accountId]/route";
+import { patchAccountStatusForUser } from "@/modules/accounts";
 
 test("patchAccountStatusForUser updates only accounts owned by the signed-in user", async () => {
   let updated: { accountId: string; isActive: boolean } | null = null;
