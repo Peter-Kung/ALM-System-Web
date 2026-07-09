@@ -54,7 +54,8 @@ defaults when you do not set environment variables:
 - Password: `change-me`
 - Session secret: `development-session-secret-change-me`
 
-You can override them with `APP_USERNAME`, `APP_PASSWORD`, `SESSION_SECRET`,
+You can override the initial owner bootstrap credentials with `APP_USERNAME`
+and `APP_PASSWORD`, and override runtime configuration with `SESSION_SECRET`
 and `DATABASE_URL`.
 
 ## Common commands
@@ -69,7 +70,9 @@ and `DATABASE_URL`.
 
 1. Open `http://localhost:3000`.
 2. The app redirects protected routes to `/login`.
-3. Sign in with the configured credentials.
+3. Sign in with the configured owner credentials. On the first successful
+   sign-in, the app stores the owner password hash in the database and later
+   sign-ins use the stored account credentials.
 
 By default, when `APP_USERNAME` and `APP_PASSWORD` are unset, use:
 

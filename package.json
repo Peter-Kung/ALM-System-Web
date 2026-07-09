@@ -6,19 +6,21 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "test": "tsx --test src/modules/valuation/service.test.ts src/modules/snapshots/service.test.ts src/modules/dashboard/service.test.ts src/lib/navigation.test.ts src/lib/date-format.test.ts src/components/app-shell-frame.test.tsx src/components/login-page-frame.test.tsx src/components/dashboard-page-view.test.tsx src/components/management-section.test.tsx src/app/api/accounts/[accountId]/route.test.ts",
+    "test": "tsx --test src/modules/auth/login-payload.test.ts src/modules/auth/service.test.ts src/modules/valuation/service.test.ts src/modules/snapshots/service.test.ts src/modules/dashboard/service.test.ts src/lib/navigation.test.ts src/lib/date-format.test.ts src/components/app-shell-frame.test.tsx src/components/login-page-frame.test.tsx src/components/dashboard-page-view.test.tsx src/components/management-section.test.tsx src/app/api/accounts/[accountId]/route.test.ts",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.11.1",
+    "bcrypt": "^6.0.0",
     "jose": "^6.0.12",
     "next": "^15.3.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^22.15.30",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",

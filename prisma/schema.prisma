@@ -71,6 +71,7 @@ enum SnapshotEntityType {
 model User {
   id          String      @id @default(cuid())
   username    String      @unique
+  passwordHash String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   accounts    Account[]

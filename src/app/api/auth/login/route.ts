@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
-import { validateFixedUserLogin } from "@/lib/auth/fixed-user";
+import { parseLoginPayload, validateOwnerLogin } from "@/modules/auth";
 
 export async function POST(request: NextRequest) {
-  const payload = (await request.json().catch(() => null)) as
-    | { username?: string; password?: string; next?: string }
-    | null;
+  const payload = parseLoginPayload(await request.json().catch(() => null));
 
   if (!payload?.username || !payload?.password) {
     return NextResponse.json(
@@ -15,7 +13,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const user = await validateFixedUserLogin(payload.username, payload.password);
+  const user = await validateOwnerLogin(payload.username, payload.password);
   if (!user) {
     return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
   }
