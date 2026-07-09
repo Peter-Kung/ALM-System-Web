@@ -15,7 +15,7 @@ type DashboardAllocationItem = {
   shareOfAssets: string;
 };
 
-type DashboardTrend = {
+export type DashboardTrend = {
   previousSnapshotAt: string;
   netWorthChange: string;
   totalAssetsChange: string;
@@ -23,7 +23,7 @@ type DashboardTrend = {
   monthlyDebtPaymentChange: string;
 };
 
-type DashboardLatestSnapshot = {
+export type DashboardLatestSnapshot = {
   id: string;
   status: Snapshot["status"];
   baseCurrency: string;
@@ -148,6 +148,26 @@ function buildTrend(
   };
 }
 
+const issueSeverityRank: Record<SnapshotIssue["severity"], number> = {
+  ERROR: 0,
+  WARNING: 1,
+  INFO: 2,
+};
+
+function buildIssueMessages(snapshot: DashboardSnapshot) {
+  return [...snapshot.issues]
+    .sort((left, right) => {
+      const severityDiff = issueSeverityRank[left.severity] - issueSeverityRank[right.severity];
+
+      if (severityDiff !== 0) {
+        return severityDiff;
+      }
+
+      return left.message.localeCompare(right.message) || left.id.localeCompare(right.id);
+    })
+    .map((issue) => issue.message);
+}
+
 export function buildDashboardSummary(snapshots: DashboardSnapshot[]): DashboardSummary {
   const [latestSnapshot, previousSnapshot] = snapshots;
 
@@ -183,7 +203,7 @@ export function buildDashboardSummary(snapshots: DashboardSnapshot[]): Dashboard
     allocation: buildAllocation(latestSnapshot),
     liabilityBreakdown: buildLiabilityBreakdown(latestSnapshot),
     trend: buildTrend(latestSnapshot, previousSnapshot),
-    issueMessages: latestSnapshot.issues.map((issue) => issue.message),
+    issueMessages: buildIssueMessages(latestSnapshot),
   };
 }
 

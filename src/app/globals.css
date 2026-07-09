@@ -447,6 +447,22 @@ button:disabled {
   grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
 }
 
+.dashboard-hero {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 2.2fr) minmax(16rem, 1fr);
+}
+
+.dashboard-summary-message {
+  margin: 0;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.dashboard-freshness h2 {
+  margin: 0;
+}
+
 .dashboard-grid {
   display: grid;
   gap: 1rem;
@@ -528,6 +544,7 @@ button:disabled {
   .login-layout,
   .management-grid,
   .field-row,
+  .dashboard-hero,
   .dashboard-grid-secondary {
     grid-template-columns: 1fr;
   }

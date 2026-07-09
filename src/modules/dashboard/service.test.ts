@@ -169,3 +169,46 @@ test("buildDashboardSummary reports trend deltas and incomplete issue messages",
     "Missing valid price record for Global Fund.",
   ]);
 });
+
+test("buildDashboardSummary sorts issue messages by severity before dashboard consumers truncate them", () => {
+  const summary = buildDashboardSummary([
+    createSnapshot({
+      status: SnapshotStatus.INCOMPLETE,
+      issues: [
+        {
+          id: "issue-3",
+          snapshotId: "snapshot-1",
+          severity: SnapshotIssueSeverity.INFO,
+          issueType: SnapshotIssueType.MISSING_PRICE,
+          affectedEntityType: SnapshotEntityType.ASSET,
+          affectedEntityId: "source-asset-3",
+          message: "Information-only reminder.",
+        },
+        {
+          id: "issue-2",
+          snapshotId: "snapshot-1",
+          severity: SnapshotIssueSeverity.WARNING,
+          issueType: SnapshotIssueType.MISSING_PRICE,
+          affectedEntityType: SnapshotEntityType.ASSET,
+          affectedEntityId: "source-asset-2",
+          message: "Warning reminder.",
+        },
+        {
+          id: "issue-1",
+          snapshotId: "snapshot-1",
+          severity: SnapshotIssueSeverity.ERROR,
+          issueType: SnapshotIssueType.MISSING_PRICE,
+          affectedEntityType: SnapshotEntityType.ASSET,
+          affectedEntityId: "source-asset-1",
+          message: "Error reminder.",
+        },
+      ],
+    }),
+  ]);
+
+  assert.deepEqual(summary.issueMessages, [
+    "Error reminder.",
+    "Warning reminder.",
+    "Information-only reminder.",
+  ]);
+});
