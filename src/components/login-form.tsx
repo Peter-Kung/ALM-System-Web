@@ -1,8 +1,51 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import React, { FormEvent, useState } from "react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
+
+export function LoginFormFields({
+  nextPath,
+  pending,
+  error,
+}: {
+  nextPath?: string;
+  pending: boolean;
+  error?: string | null;
+}) {
+  return (
+    <>
+      <div className="stack">
+        <div>
+          <p className="eyebrow">Owner sign in</p>
+          <h1>Sign in to workspace</h1>
+        </div>
+        <p className="muted">
+          Use the current owner credentials for this environment. Successful sign-in
+          returns you to the requested route or the dashboard.
+        </p>
+      </div>
+      <input name="next" type="hidden" value={nextPath ?? ""} />
+      <label className="field">
+        <span>Username</span>
+        <input name="username" autoComplete="username" required />
+      </label>
+      <label className="field">
+        <span>Password</span>
+        <input
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          required
+        />
+      </label>
+      {error ? <p className="error">{error}</p> : null}
+      <button type="submit" disabled={pending}>
+        {pending ? "Signing in..." : "Sign in"}
+      </button>
+    </>
+  );
+}
 
 export function LoginForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
@@ -42,31 +85,8 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
   }
 
   return (
-    <form className="card stack" onSubmit={handleSubmit}>
-      <div>
-        <h1>Sign in</h1>
-        <p className="muted">
-          Use the fixed owner credentials configured for this environment.
-        </p>
-      </div>
-      <input name="next" type="hidden" value={nextPath ?? ""} />
-      <label className="stack">
-        <span>Username</span>
-        <input name="username" autoComplete="username" required />
-      </label>
-      <label className="stack">
-        <span>Password</span>
-        <input
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-        />
-      </label>
-      {error ? <p className="error">{error}</p> : null}
-      <button type="submit" disabled={pending}>
-        {pending ? "Signing in..." : "Sign in"}
-      </button>
+    <form className="card login-card stack" onSubmit={handleSubmit}>
+      <LoginFormFields nextPath={nextPath} pending={pending} error={error} />
     </form>
   );
 }

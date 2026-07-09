@@ -102,6 +102,76 @@ button:disabled {
   padding: 2rem;
 }
 
+.login-layout {
+  display: grid;
+  gap: 1.5rem;
+  width: min(76rem, 100%);
+  grid-template-columns: minmax(0, 1.45fr) minmax(21rem, 28rem);
+  grid-template-areas: "hero panel";
+  align-items: stretch;
+}
+
+.login-hero,
+.login-panel {
+  min-height: 100%;
+}
+
+.login-hero {
+  grid-area: hero;
+  position: relative;
+  overflow: hidden;
+  padding: 2.2rem;
+  border-radius: 32px;
+  border: 1px solid rgba(67, 82, 52, 0.14);
+  background:
+    radial-gradient(circle at top left, rgba(199, 157, 92, 0.18), transparent 26%),
+    radial-gradient(circle at 82% 18%, rgba(125, 143, 90, 0.2), transparent 24%),
+    linear-gradient(180deg, rgba(255, 252, 246, 0.92), rgba(246, 238, 225, 0.88));
+  box-shadow: var(--shadow);
+}
+
+.login-brand {
+  gap: 1.25rem;
+}
+
+.login-brand-mark {
+  width: 3.6rem;
+  height: 3.6rem;
+}
+
+.login-hero h2,
+.login-card h1,
+.login-highlight-card h2 {
+  margin: 0;
+}
+
+.login-hero .muted,
+.login-highlight-card .muted {
+  max-width: 36rem;
+}
+
+.login-highlight-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: auto;
+}
+
+.login-highlight-card {
+  min-height: 100%;
+}
+
+.login-panel {
+  grid-area: panel;
+  align-self: center;
+}
+
+.login-card {
+  width: 100%;
+  padding: 2.15rem;
+  background: rgba(255, 253, 249, 0.96);
+}
+
 .shell {
   display: grid;
   grid-template-columns: minmax(18rem, 21rem) minmax(0, 1fr);
@@ -455,10 +525,17 @@ button:disabled {
 }
 
 @media (max-width: 900px) {
+  .login-layout,
   .management-grid,
   .field-row,
   .dashboard-grid-secondary {
     grid-template-columns: 1fr;
+  }
+
+  .login-layout {
+    grid-template-areas:
+      "panel"
+      "hero";
   }
 
   .main-panel,
@@ -466,7 +543,21 @@ button:disabled {
     padding: 1rem;
   }
 
+  .login-page {
+    place-items: stretch;
+    align-content: start;
+  }
+
   .sidebar {
     padding: 1.15rem;
+  }
+
+  .login-hero,
+  .login-card {
+    padding: 1.4rem;
+  }
+
+  .login-highlight-grid {
+    grid-template-columns: 1fr;
   }
 }

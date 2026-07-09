@@ -1,6 +1,7 @@
 import Link from "next/link";
 import React from "react";
 import { ReactNode } from "react";
+import type { Route } from "next";
 
 import { footerNavigation, primaryNavigation } from "@/lib/navigation";
 
@@ -62,7 +63,7 @@ export function AppShellFrame({
                   return (
                     <Link
                       key={section.href}
-                      href={section.href}
+                      href={section.href as Route}
                       className={`nav-link ${isActive ? "nav-link-active" : ""}`}
                     >
                       <span className="nav-link-index">{section.shortLabel}</span>
@@ -83,7 +84,7 @@ export function AppShellFrame({
             return (
               <Link
                 key={section.href}
-                href={section.href}
+                href={section.href as Route}
                 className={`nav-link nav-link-footer ${isActive ? "nav-link-active" : ""}`}
               >
                 <span className="nav-link-index">{section.shortLabel}</span>
