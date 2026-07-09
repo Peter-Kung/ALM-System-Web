@@ -42,6 +42,10 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
   const heroSummary = dashboard.heroSummary;
   const coverage = dashboard.coverage;
   const reminders = dashboard.reminders;
+  const reminderSummary =
+    reminders.issueCount === 0
+      ? "No reminder items recorded in the latest snapshot."
+      : `${reminders.issueCount} reminder item${reminders.issueCount === 1 ? "" : "s"} recorded in the latest snapshot.`;
 
   return (
     <section className="stack">
@@ -65,6 +69,7 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
             Reporting from the latest saved snapshot taken on{" "}
             {formatDateTime(heroSummary?.snapshotAt ?? snapshot.snapshotAt)}.
           </p>
+          <p className="muted">{reminderSummary}</p>
         </div>
 
         <article className="resource-card stack dashboard-freshness">
@@ -91,132 +96,25 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
           </p>
         </article>
         <article className="resource-card stack">
+          <p className="eyebrow">Total assets</p>
+          <h2>
+            {snapshot.totalAssets} {snapshot.baseCurrency}
+          </h2>
+          <p className="muted">Stored account cash plus saved holding values.</p>
+        </article>
+        <article className="resource-card stack">
+          <p className="eyebrow">Total liabilities</p>
+          <h2>
+            {snapshot.totalLiabilities} {snapshot.baseCurrency}
+          </h2>
+          <p className="muted">Saved debt balances carried by the latest snapshot.</p>
+        </article>
+        <article className="resource-card stack">
           <p className="eyebrow">Cash position</p>
           <h2>
             {snapshot.cashPosition} {snapshot.baseCurrency}
           </h2>
           <p className="muted">Saved cash balances from the latest formal snapshot.</p>
-        </article>
-        <article className="resource-card stack">
-          <p className="eyebrow">Investment value</p>
-          <h2>
-            {snapshot.investmentValue} {snapshot.baseCurrency}
-          </h2>
-          <p className="muted">Derived from the stored holding valuations in the snapshot.</p>
-        </article>
-        <article className="resource-card stack">
-          <p className="eyebrow">Debt pressure</p>
-          <h2>
-            {snapshot.monthlyDebtPaymentTotal} {snapshot.baseCurrency}
-          </h2>
-          <p className="muted">
-            Monthly debt payments across {snapshot.liabilityCount} saved liabilities.
-          </p>
-        </article>
-      </div>
-
-      <div className="dashboard-grid dashboard-grid-secondary">
-        <article className="resource-card stack">
-          <div className="section-heading">
-            <div>
-              <h2>Allocation</h2>
-              <p className="muted">
-                Cash and investment mix from the latest saved snapshot.
-              </p>
-            </div>
-          </div>
-          {dashboard.allocation.length === 0 ? (
-            <p className="muted">No asset allocation data is stored yet.</p>
-          ) : (
-            <div className="stack">
-              {dashboard.allocation.map((item) => (
-                <div key={item.label} className="metric-row">
-                  <div>
-                    <strong>{item.label}</strong>
-                    <p className="muted">{item.shareOfAssets}% of total assets</p>
-                  </div>
-                  <strong>
-                    {item.value} {snapshot.baseCurrency}
-                  </strong>
-                </div>
-              ))}
-            </div>
-          )}
-        </article>
-
-        <article className="resource-card stack">
-          <div className="section-heading">
-            <div>
-              <h2>Debt balances</h2>
-              <p className="muted">Latest liability breakdown from immutable snapshot data.</p>
-            </div>
-          </div>
-          {dashboard.liabilityBreakdown.length === 0 ? (
-            <p className="muted">No liabilities are stored in the latest snapshot.</p>
-          ) : (
-            <div className="stack">
-              {dashboard.liabilityBreakdown.map((item) => (
-                <div key={item.label} className="metric-row">
-                  <div>
-                    <strong>{item.label}</strong>
-                    <p className="muted">{item.shareOfAssets}% of total liabilities</p>
-                  </div>
-                  <strong>
-                    {item.value} {snapshot.baseCurrency}
-                  </strong>
-                </div>
-              ))}
-            </div>
-          )}
-        </article>
-
-        <article className="resource-card stack">
-          <div className="section-heading">
-            <div>
-              <h2>Trend summary</h2>
-              <p className="muted">
-                {dashboard.trend
-                  ? `Compared with the snapshot from ${formatDateTime(
-                      dashboard.trend.previousSnapshotAt,
-                    )}.`
-                  : "Create one more snapshot to unlock comparison trends."}
-              </p>
-            </div>
-          </div>
-          {dashboard.trend ? (
-            <dl className="detail-grid">
-              <div>
-                <dt>Net worth change</dt>
-                <dd>{formatSignedAmount(dashboard.trend.netWorthChange, snapshot.baseCurrency)}</dd>
-              </div>
-              <div>
-                <dt>Asset change</dt>
-                <dd>
-                  {formatSignedAmount(dashboard.trend.totalAssetsChange, snapshot.baseCurrency)}
-                </dd>
-              </div>
-              <div>
-                <dt>Liability change</dt>
-                <dd>
-                  {formatSignedAmount(
-                    dashboard.trend.totalLiabilitiesChange,
-                    snapshot.baseCurrency,
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>Monthly debt change</dt>
-                <dd>
-                  {formatSignedAmount(
-                    dashboard.trend.monthlyDebtPaymentChange,
-                    snapshot.baseCurrency,
-                  )}
-                </dd>
-              </div>
-            </dl>
-          ) : (
-            <p className="muted">The latest snapshot has no earlier snapshot to compare against.</p>
-          )}
         </article>
       </div>
 
@@ -327,10 +225,4 @@ function formatShortDateTime(value: string) {
     timeStyle: "short",
     timeZone: "UTC",
   });
-}
-
-function formatSignedAmount(value: string, currency: string) {
-  const numeric = Number(value);
-  const prefix = numeric > 0 ? "+" : "";
-  return `${prefix}${value} ${currency}`;
 }

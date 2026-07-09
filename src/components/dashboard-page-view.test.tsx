@@ -142,14 +142,18 @@ test("dashboard page view renders summary-first sections and limits reminders to
 
   assert.match(markup, /Freshness/);
   assert.match(markup, /Net worth/);
+  assert.match(markup, /Total assets/);
+  assert.match(markup, /Total liabilities/);
   assert.match(markup, /Cash position/);
-  assert.match(markup, /Investment value/);
-  assert.match(markup, /Debt pressure/);
   assert.match(markup, /Reminders/);
   assert.match(markup, /Coverage/);
   assert.match(markup, /The latest snapshot is usable, but reminder items still need follow-up\./);
+  assert.match(markup, /4 reminder items recorded in the latest snapshot\./);
   assert.match(markup, /Missing valid price record for Global Fund\./);
   assert.match(markup, /FX rate for USD is stale\./);
   assert.match(markup, /Cash account balance needs refresh\./);
   assert.doesNotMatch(markup, /Older reminder should be hidden\./);
+  assert.doesNotMatch(markup, /Allocation/);
+  assert.doesNotMatch(markup, /Trend summary/);
+  assert.doesNotMatch(markup, /Debt balances/);
 });
