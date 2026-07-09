@@ -6,6 +6,7 @@ import {
   AssetType,
   LiabilityType,
 } from "@prisma/client";
+import React from "react";
 import { FormEvent, useEffect, useState } from "react";
 
 import { SnapshotManager } from "@/components/snapshot-manager";
@@ -236,12 +237,47 @@ export function ManagementSection({ section }: SectionProps) {
   );
 }
 
+export function formatCurrencyAmount(value: string, currency: string) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return `${currency} ${value}`;
+  }
+
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(numericValue);
+  } catch {
+    return `${currency} ${value}`;
+  }
+}
+
+export function getAccountActionLabel(
+  account: Pick<AccountRecord, "name" | "institutionName">,
+  action: "edit" | "archive" | "activate",
+) {
+  const target = `${account.name} at ${account.institutionName}`;
+
+  switch (action) {
+    case "edit":
+      return `Edit ${target}`;
+    case "archive":
+      return `Archive ${target}`;
+    case "activate":
+      return `Mark ${target} active`;
+  }
+}
+
 function AccountsManager() {
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
   const [form, setForm] = useState<AccountFormState>(emptyAccountForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTogglingId, setIsTogglingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -329,6 +365,52 @@ function AccountsManager() {
     setForm(emptyAccountForm);
   }
 
+  async function toggleAccountStatus(account: AccountRecord, isActive: boolean) {
+    setIsTogglingId(account.id);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/accounts/${account.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          isActive,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        account?: AccountRecord;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.account) {
+        throw new Error(payload.error ?? "Failed to update account status.");
+      }
+
+      setAccounts((currentAccounts) =>
+        currentAccounts.map((currentAccount) =>
+          currentAccount.id === payload.account?.id ? payload.account : currentAccount,
+        ),
+      );
+
+      if (editingId === account.id) {
+        setForm((currentForm) => ({ ...currentForm, isActive }));
+      }
+    } catch (statusError) {
+      setError(
+        statusError instanceof Error
+          ? statusError.message
+          : "Failed to update account status.",
+      );
+    } finally {
+      setIsTogglingId(null);
+    }
+  }
+
+  const activeCount = accounts.filter((account) => account.isActive).length;
+  const inactiveCount = accounts.length - activeCount;
+  const institutionCount = new Set(accounts.map((account) => account.institutionName)).size;
+
   return (
     <section className="stack">
       <div className="hero stack">
@@ -338,9 +420,27 @@ function AccountsManager() {
           Maintain cash, bank, and brokerage accounts with current balances and
           active status.
         </p>
+        <div className="management-highlight-grid">
+          <article className="management-highlight-card">
+            <p className="eyebrow">Active accounts</p>
+            <strong>{activeCount}</strong>
+            <p className="muted">Available for valuation and payment workflows.</p>
+          </article>
+          <article className="management-highlight-card">
+            <p className="eyebrow">Institutions</p>
+            <strong>{institutionCount}</strong>
+            <p className="muted">Grouped by the institutions you maintain here.</p>
+          </article>
+          <article className="management-highlight-card">
+            <p className="eyebrow">Archived</p>
+            <strong>{inactiveCount}</strong>
+            <p className="muted">Inactive accounts stay visible without cluttering live data.</p>
+          </article>
+        </div>
       </div>
-      <div className="management-grid">
-        <form className="card stack" onSubmit={handleSubmit}>
+      <div className="management-grid management-grid-accounts">
+        <div className="management-form-column">
+          <form className="card stack" aria-label="Account editor" onSubmit={handleSubmit}>
           <div className="section-heading">
             <h2>{editingId ? "Edit account" : "Add account"}</h2>
             {editingId ? (
@@ -423,10 +523,14 @@ function AccountsManager() {
           <button type="submit" disabled={isSaving}>
             {isSaving ? "Saving..." : editingId ? "Save account" : "Create account"}
           </button>
-        </form>
-        <div className="stack">
+          </form>
+        </div>
+        <section className="stack" aria-label="Account record list">
           <div className="section-heading">
-            <h2>Existing accounts</h2>
+            <div>
+              <h2>Existing accounts</h2>
+              <p className="muted">Card-based workspace view for every maintained account.</p>
+            </div>
             <p className="muted">{accounts.length} account records</p>
           </div>
           {isLoading ? <div className="placeholder">Loading accounts...</div> : null}
@@ -434,40 +538,61 @@ function AccountsManager() {
             <div className="placeholder">No accounts yet. Create the first account.</div>
           ) : null}
           {accounts.map((account) => (
-            <article key={account.id} className="resource-card stack">
+            <article key={account.id} className="resource-card resource-card-account stack">
               <div className="section-heading">
                 <div>
                   <h3>{account.name}</h3>
-                  <p className="muted">
-                    {account.institutionName} · {formatEnumLabel(account.accountType)}
-                  </p>
+                  <p className="muted">{account.institutionName}</p>
                 </div>
+                <span className={`status-pill ${account.isActive ? "status-complete" : "status-incomplete"}`}>
+                  {account.isActive ? "Active" : "Archived"}
+                </span>
+              </div>
+              <div className="account-card-balance">
+                <p className="eyebrow">Cash balance</p>
+                <strong>{formatCurrencyAmount(account.cashBalance, account.currency)}</strong>
+              </div>
+              <dl className="detail-grid detail-grid-accounts">
+                <div>
+                  <dt>Account type</dt>
+                  <dd>{formatEnumLabel(account.accountType)}</dd>
+                </div>
+                <div>
+                  <dt>Currency</dt>
+                  <dd>{account.currency}</dd>
+                </div>
+              </dl>
+              {account.notes ? <p className="muted">{account.notes}</p> : null}
+              <div className="account-card-actions">
                 <button
                   type="button"
+                  aria-label={getAccountActionLabel(account, "edit")}
                   className="ghost-button compact-button"
                   onClick={() => beginEdit(account)}
                 >
                   Edit
                 </button>
+                <button
+                  type="button"
+                  aria-label={
+                    account.isActive
+                      ? getAccountActionLabel(account, "archive")
+                      : getAccountActionLabel(account, "activate")
+                  }
+                  className="ghost-button compact-button"
+                  disabled={isTogglingId === account.id}
+                  onClick={() => toggleAccountStatus(account, !account.isActive)}
+                >
+                  {isTogglingId === account.id
+                    ? "Updating..."
+                    : account.isActive
+                      ? "Archive"
+                      : "Mark active"}
+                </button>
               </div>
-              <dl className="detail-grid">
-                <div>
-                  <dt>Currency</dt>
-                  <dd>{account.currency}</dd>
-                </div>
-                <div>
-                  <dt>Cash balance</dt>
-                  <dd>{account.cashBalance}</dd>
-                </div>
-                <div>
-                  <dt>Status</dt>
-                  <dd>{account.isActive ? "Active" : "Inactive"}</dd>
-                </div>
-              </dl>
-              {account.notes ? <p className="muted">{account.notes}</p> : null}
             </article>
           ))}
-        </div>
+        </section>
       </div>
     </section>
   );

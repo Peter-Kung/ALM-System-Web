@@ -399,6 +399,42 @@ button:disabled {
   align-items: start;
 }
 
+.management-highlight-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.management-highlight-card {
+  padding: 1.15rem 1.2rem;
+  border-radius: 1.35rem;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(145deg, rgba(199, 157, 92, 0.08), rgba(255, 255, 255, 0)),
+    rgba(255, 252, 246, 0.78);
+}
+
+.management-highlight-card strong,
+.account-card-balance strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.35rem;
+  color: var(--ink);
+}
+
+.management-highlight-card p {
+  margin: 0;
+}
+
+.management-grid-accounts {
+  grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr);
+}
+
+.management-form-column {
+  position: sticky;
+  top: 1.5rem;
+}
+
 .section-heading {
   display: flex;
   gap: 1rem;
@@ -445,6 +481,35 @@ button:disabled {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+}
+
+.detail-grid-accounts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.resource-card-account {
+  gap: 1.15rem;
+  background:
+    linear-gradient(145deg, rgba(199, 157, 92, 0.08), rgba(255, 255, 255, 0)),
+    var(--panel);
+}
+
+.account-card-balance {
+  padding: 1rem 1.05rem;
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(67, 82, 52, 0.08);
+}
+
+.account-card-balance p,
+.account-card-actions {
+  margin: 0;
+}
+
+.account-card-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .dashboard-hero {
@@ -543,6 +608,7 @@ button:disabled {
 @media (max-width: 900px) {
   .login-layout,
   .management-grid,
+  .management-highlight-grid,
   .field-row,
   .dashboard-hero,
   .dashboard-grid-secondary {
@@ -567,6 +633,11 @@ button:disabled {
 
   .sidebar {
     padding: 1.15rem;
+  }
+
+  .management-form-column {
+    position: static;
+    top: auto;
   }
 
   .login-hero,
