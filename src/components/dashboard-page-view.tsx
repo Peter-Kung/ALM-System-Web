@@ -10,6 +10,8 @@ type DashboardPageViewProps = {
 
 export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
   if (!dashboard.latestSnapshot) {
+    const emptyState = dashboard.emptyState;
+
     return (
       <section className="stack">
         <div className="hero stack">
@@ -27,7 +29,9 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
             snapshot for dashboard reporting.
           </p>
           <div>
-            <DashboardLink href="/manage/valuation">Open valuation workspace</DashboardLink>
+            <DashboardLink href={emptyState?.actionHref ?? "/manage/valuation"}>
+              Open valuation workspace
+            </DashboardLink>
           </div>
         </article>
       </section>
@@ -35,7 +39,9 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
   }
 
   const snapshot = dashboard.latestSnapshot;
-  const reminderMessages = dashboard.issueMessages.slice(0, 3);
+  const heroSummary = dashboard.heroSummary;
+  const coverage = dashboard.coverage;
+  const reminders = dashboard.reminders;
 
   return (
     <section className="stack">
@@ -54,16 +60,10 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
               {snapshot.status === "COMPLETE" ? "Snapshot complete" : "Snapshot incomplete"}
             </span>
           </div>
-          <p className="dashboard-summary-message">
-            {buildSummaryMessage({
-              hasTrend: Boolean(dashboard.trend),
-              issueCount: snapshot.issueCount,
-              status: snapshot.status,
-            })}
-          </p>
+          <p className="dashboard-summary-message">{buildHeroMessage(heroSummary)}</p>
           <p className="muted">
             Reporting from the latest saved snapshot taken on{" "}
-            {formatDateTime(snapshot.snapshotAt)}.
+            {formatDateTime(heroSummary?.snapshotAt ?? snapshot.snapshotAt)}.
           </p>
         </div>
 
@@ -71,8 +71,10 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
           <p className="eyebrow">Freshness</p>
           <h2>{formatShortDateTime(snapshot.snapshotAt)}</h2>
           <p className="muted">
-            {snapshot.accountCount} accounts, {snapshot.holdingCount} holdings, and{" "}
-            {snapshot.liabilityCount} liabilities represented in the current summary.
+            {coverage?.accountCount ?? snapshot.accountCount} accounts,{" "}
+            {coverage?.holdingCount ?? snapshot.holdingCount} holdings, and{" "}
+            {coverage?.liabilityCount ?? snapshot.liabilityCount} liabilities represented in
+            the current summary.
           </p>
         </article>
       </div>
@@ -224,18 +226,18 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
             <div>
               <h2>Reminders</h2>
               <p className="muted">
-                {snapshot.issueCount === 0
+                {reminders.issueCount === 0
                   ? "No active reminders in the latest snapshot."
-                  : `${snapshot.issueCount} stored issues in the latest snapshot.`}
+                  : `${reminders.issueCount} stored issues in the latest snapshot.`}
               </p>
             </div>
             <DashboardLink href="/manage/snapshots">Review history</DashboardLink>
           </div>
-          {reminderMessages.length === 0 ? (
+          {reminders.visibleMessages.length === 0 ? (
             <p className="muted">The latest snapshot completed without missing-input warnings.</p>
           ) : (
             <div className="stack">
-              {reminderMessages.map((message) => (
+              {reminders.visibleMessages.map((message) => (
                 <div key={message} className="issue-note">
                   {message}
                 </div>
@@ -254,19 +256,19 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
           <dl className="detail-grid">
             <div>
               <dt>Accounts</dt>
-              <dd>{snapshot.accountCount}</dd>
+              <dd>{coverage?.accountCount ?? snapshot.accountCount}</dd>
             </div>
             <div>
               <dt>Holdings</dt>
-              <dd>{snapshot.holdingCount}</dd>
+              <dd>{coverage?.holdingCount ?? snapshot.holdingCount}</dd>
             </div>
             <div>
               <dt>Liabilities</dt>
-              <dd>{snapshot.liabilityCount}</dd>
+              <dd>{coverage?.liabilityCount ?? snapshot.liabilityCount}</dd>
             </div>
             <div>
               <dt>Snapshot time</dt>
-              <dd>{formatShortDateTime(snapshot.snapshotAt)}</dd>
+              <dd>{formatShortDateTime(coverage?.snapshotAt ?? snapshot.snapshotAt)}</dd>
             </div>
           </dl>
         </article>
@@ -283,30 +285,32 @@ function DashboardLink({ href, children }: { href: Route; children: string }) {
   );
 }
 
-function buildSummaryMessage({
-  hasTrend,
-  issueCount,
-  status,
-}: {
-  hasTrend: boolean;
-  issueCount: number;
-  status: "COMPLETE" | "INCOMPLETE";
-}) {
-  if (status === "INCOMPLETE") {
-    return issueCount > 0
-      ? "The latest snapshot needs attention before the next review cycle."
+function buildHeroMessage(
+  heroSummary: DashboardSummary["heroSummary"],
+) {
+  if (!heroSummary) {
+    return "The latest snapshot is current and ready for a deeper balance-sheet review.";
+  }
+
+  if (heroSummary.status === "INCOMPLETE") {
+    return heroSummary.issueCount > 0
+      ? "The latest snapshot is incomplete and needs reminder follow-up before reuse."
       : "The latest snapshot is incomplete and should be reviewed before reuse.";
   }
 
-  if (issueCount > 0) {
+  if (heroSummary.netWorthDirection === "negative") {
+    return "The latest snapshot shows liabilities outweighing assets and needs attention.";
+  }
+
+  if (heroSummary.issueCount > 0) {
     return "The latest snapshot is usable, but reminder items still need follow-up.";
   }
 
-  if (hasTrend) {
+  if (heroSummary.hasTrend) {
     return "The latest snapshot is current and ready for side-by-side trend review.";
   }
 
-  return "The latest snapshot is current and ready for a deeper balance-sheet review.";
+  return "The latest snapshot is complete and ready for a deeper balance-sheet review.";
 }
 
 function formatDateTime(value: string) {

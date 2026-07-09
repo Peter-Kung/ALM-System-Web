@@ -12,6 +12,24 @@ function createDashboardSummary(
   overrides: Partial<DashboardSummary> = {},
 ): DashboardSummary {
   return {
+    sidebarSummary: {
+      hasSnapshot: true,
+      snapshotAt: "2026-07-08T00:00:00.000Z",
+      netWorth: "800.00",
+      baseCurrency: "TWD",
+      status: SnapshotStatus.COMPLETE,
+      accountCount: 2,
+      holdingCount: 3,
+      reminderLabel: "Missing valid price record for Global Fund.",
+    },
+    emptyState: null,
+    heroSummary: {
+      snapshotAt: "2026-07-08T00:00:00.000Z",
+      status: SnapshotStatus.COMPLETE,
+      issueCount: 4,
+      hasTrend: true,
+      netWorthDirection: "positive",
+    },
     latestSnapshot: {
       id: "snapshot-1",
       status: SnapshotStatus.COMPLETE,
@@ -28,6 +46,21 @@ function createDashboardSummary(
       holdingCount: 3,
       liabilityCount: 1,
     },
+    coverage: {
+      accountCount: 2,
+      holdingCount: 3,
+      liabilityCount: 1,
+      snapshotAt: "2026-07-08T00:00:00.000Z",
+    },
+    reminders: {
+      issueCount: 4,
+      visibleMessages: [
+        "Missing valid price record for Global Fund.",
+        "FX rate for USD is stale.",
+        "Cash account balance needs refresh.",
+      ],
+      remainingCount: 1,
+    },
     allocation: [{ label: "Stock", value: "900.00", shareOfAssets: "75.00" }],
     liabilityBreakdown: [
       { label: "Mortgage", value: "400.00", shareOfAssets: "100.00" },
@@ -39,6 +72,20 @@ function createDashboardSummary(
       totalLiabilitiesChange: "20.00",
       monthlyDebtPaymentChange: "5.00",
     },
+    trendSeries: [
+      {
+        snapshotAt: "2026-07-01T00:00:00.000Z",
+        netWorth: "720.00",
+        totalAssets: "1100.00",
+        totalLiabilities: "380.00",
+      },
+      {
+        snapshotAt: "2026-07-08T00:00:00.000Z",
+        netWorth: "800.00",
+        totalAssets: "1200.00",
+        totalLiabilities: "400.00",
+      },
+    ],
     issueMessages: [
       "Missing valid price record for Global Fund.",
       "FX rate for USD is stale.",
@@ -53,10 +100,31 @@ test("dashboard page view renders the guided empty state when no snapshot exists
   const markup = renderToStaticMarkup(
     <DashboardPageView
       dashboard={{
+        sidebarSummary: {
+          hasSnapshot: false,
+          snapshotAt: null,
+          netWorth: null,
+          baseCurrency: null,
+          status: null,
+          accountCount: 0,
+          holdingCount: 0,
+          reminderLabel: "Run the first valuation preview to populate the workspace pulse.",
+        },
+        emptyState: {
+          actionHref: "/manage/valuation",
+        },
+        heroSummary: null,
         latestSnapshot: null,
+        coverage: null,
+        reminders: {
+          issueCount: 0,
+          visibleMessages: [],
+          remainingCount: 0,
+        },
         allocation: [],
         liabilityBreakdown: [],
         trend: null,
+        trendSeries: [],
         issueMessages: [],
       }}
     />,

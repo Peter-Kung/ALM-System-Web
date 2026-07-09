@@ -91,16 +91,55 @@ function createSnapshot(overrides: Partial<Parameters<typeof buildDashboardSumma
 test("buildDashboardSummary returns empty dashboard data when no snapshots exist", () => {
   const summary = buildDashboardSummary([]);
 
+  assert.deepEqual(summary.sidebarSummary, {
+    hasSnapshot: false,
+    snapshotAt: null,
+    netWorth: null,
+    baseCurrency: null,
+    status: null,
+    accountCount: 0,
+    holdingCount: 0,
+    reminderLabel: "Run the first valuation preview to populate the workspace pulse.",
+  });
+  assert.deepEqual(summary.emptyState, {
+    actionHref: "/manage/valuation",
+  });
+  assert.equal(summary.heroSummary, null);
   assert.equal(summary.latestSnapshot, null);
+  assert.equal(summary.coverage, null);
+  assert.deepEqual(summary.reminders, {
+    issueCount: 0,
+    visibleMessages: [],
+    remainingCount: 0,
+  });
   assert.deepEqual(summary.allocation, []);
   assert.deepEqual(summary.liabilityBreakdown, []);
   assert.equal(summary.trend, null);
+  assert.deepEqual(summary.trendSeries, []);
   assert.deepEqual(summary.issueMessages, []);
 });
 
 test("buildDashboardSummary summarizes the latest snapshot for the homepage", () => {
   const summary = buildDashboardSummary([createSnapshot()]);
 
+  assert.deepEqual(summary.sidebarSummary, {
+    hasSnapshot: true,
+    snapshotAt: "2026-07-08T00:00:00.000Z",
+    netWorth: "800.00",
+    baseCurrency: "TWD",
+    status: SnapshotStatus.COMPLETE,
+    accountCount: 1,
+    holdingCount: 1,
+    reminderLabel: "1 accounts and 1 holdings represented.",
+  });
+  assert.equal(summary.emptyState, null);
+  assert.deepEqual(summary.heroSummary, {
+    snapshotAt: "2026-07-08T00:00:00.000Z",
+    status: SnapshotStatus.COMPLETE,
+    issueCount: 0,
+    hasTrend: false,
+    netWorthDirection: "positive",
+  });
   assert.deepEqual(summary.latestSnapshot, {
     id: "snapshot-1",
     status: SnapshotStatus.COMPLETE,
@@ -117,6 +156,17 @@ test("buildDashboardSummary summarizes the latest snapshot for the homepage", ()
     holdingCount: 1,
     liabilityCount: 1,
   });
+  assert.deepEqual(summary.coverage, {
+    accountCount: 1,
+    holdingCount: 1,
+    liabilityCount: 1,
+    snapshotAt: "2026-07-08T00:00:00.000Z",
+  });
+  assert.deepEqual(summary.reminders, {
+    issueCount: 0,
+    visibleMessages: [],
+    remainingCount: 0,
+  });
   assert.deepEqual(summary.allocation, [
     { label: "Stock", value: "900.00", shareOfAssets: "75.00" },
     { label: "Cash", value: "300.00", shareOfAssets: "25.00" },
@@ -125,6 +175,7 @@ test("buildDashboardSummary summarizes the latest snapshot for the homepage", ()
     { label: "Mortgage", value: "400.00", shareOfAssets: "100.00" },
   ]);
   assert.equal(summary.trend, null);
+  assert.deepEqual(summary.trendSeries, []);
 });
 
 test("buildDashboardSummary reports trend deltas and incomplete issue messages", () => {
@@ -165,9 +216,35 @@ test("buildDashboardSummary reports trend deltas and incomplete issue messages",
     totalLiabilitiesChange: "20.00",
     monthlyDebtPaymentChange: "5.00",
   });
+  assert.deepEqual(summary.trendSeries, [
+    {
+      snapshotAt: "2026-07-01T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+    },
+    {
+      snapshotAt: "2026-07-08T00:00:00.000Z",
+      netWorth: "880.00",
+      totalAssets: "1300.00",
+      totalLiabilities: "420.00",
+    },
+  ]);
   assert.deepEqual(summary.issueMessages, [
     "Missing valid price record for Global Fund.",
   ]);
+  assert.deepEqual(summary.reminders, {
+    issueCount: 1,
+    visibleMessages: ["Missing valid price record for Global Fund."],
+    remainingCount: 0,
+  });
+  assert.deepEqual(summary.heroSummary, {
+    snapshotAt: "2026-07-08T00:00:00.000Z",
+    status: SnapshotStatus.INCOMPLETE,
+    issueCount: 1,
+    hasTrend: true,
+    netWorthDirection: "positive",
+  });
 });
 
 test("buildDashboardSummary sorts issue messages by severity before dashboard consumers truncate them", () => {
@@ -211,4 +288,41 @@ test("buildDashboardSummary sorts issue messages by severity before dashboard co
     "Warning reminder.",
     "Information-only reminder.",
   ]);
+  assert.deepEqual(summary.reminders, {
+    issueCount: 3,
+    visibleMessages: [
+      "Error reminder.",
+      "Warning reminder.",
+      "Information-only reminder.",
+    ],
+    remainingCount: 0,
+  });
+});
+
+test("buildDashboardSummary uses a net-worth-aware hero message when the latest snapshot is complete", () => {
+  const summary = buildDashboardSummary([
+    createSnapshot({
+      totalAssets: decimal("300.00"),
+      totalLiabilities: decimal("500.00"),
+      netWorth: decimal("-200.00"),
+    }),
+  ]);
+
+  assert.equal(
+    summary.heroSummary?.netWorthDirection,
+    "negative",
+  );
+});
+
+test("buildDashboardSummary marks complete snapshots with history as trend-ready", () => {
+  const summary = buildDashboardSummary([
+    createSnapshot(),
+    createSnapshot({
+      id: "snapshot-0",
+      snapshotAt: new Date("2026-07-01T00:00:00.000Z"),
+      createdAt: new Date("2026-07-01T00:00:00.000Z"),
+    }),
+  ]);
+
+  assert.equal(summary.heroSummary?.hasTrend, true);
 });
