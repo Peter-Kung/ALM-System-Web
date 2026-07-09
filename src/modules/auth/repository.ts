@@ -7,6 +7,17 @@ export type AuthUser = Pick<User, "id" | "username" | "passwordHash" | "createdA
 
 export function createAuthRepository(db: PrismaExecutor = prisma) {
   return {
+    findById(id: string): Promise<AuthUser | null> {
+      return db.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          username: true,
+          passwordHash: true,
+          createdAt: true,
+        },
+      });
+    },
     findByUsername(username: string): Promise<AuthUser | null> {
       return db.user.findUnique({
         where: { username },

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { AuthRepository, AuthUser } from "@/modules/auth/repository";
+import { RepositoryValidationError } from "@/lib/repository-utils";
 import {
   hashPassword,
+  updateAccountCredentials,
   validateOwnerLogin,
   verifyPassword,
 } from "@/modules/auth/service";
@@ -12,6 +14,9 @@ function createRepositoryFixture(initialUsers: AuthUser[] = []): AuthRepository 
   const users = [...initialUsers];
 
   return {
+    async findById(id) {
+      return users.find((user) => user.id === id) ?? null;
+    },
     async findByUsername(username) {
       return users.find((user) => user.username === username) ?? null;
     },
@@ -115,6 +120,9 @@ test("validateOwnerLogin recovers when a concurrent bootstrap creates the owner 
   const passwordHash = await hashPassword("change-me");
   const users: AuthUser[] = [];
   const repository: AuthRepository = {
+    async findById(id) {
+      return users.find((user) => user.id === id) ?? null;
+    },
     async findByUsername(username) {
       return users.find((user) => user.username === username) ?? null;
     },
@@ -143,4 +151,171 @@ test("validateOwnerLogin recovers when a concurrent bootstrap creates the owner 
 
   assert.ok(user);
   assert.equal(user.id, "user-1");
+});
+
+test("updateAccountCredentials updates the username and password after validating the current password", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("current-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const user = await updateAccountCredentials(
+    {
+      userId: "user-1",
+      currentPassword: "current-password",
+      username: " owner.next ",
+      newPassword: "new-password",
+      confirmNewPassword: "new-password",
+    },
+    repository,
+  );
+
+  assert.equal(user.username, "owner.next");
+  assert.ok(user.passwordHash);
+  assert.equal(await verifyPassword("new-password", user.passwordHash), true);
+});
+
+test("updateAccountCredentials backfills the legacy password hash before saving changes", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: null,
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const user = await updateAccountCredentials(
+    {
+      userId: "user-1",
+      currentPassword: "change-me",
+      newPassword: "new-password",
+      confirmNewPassword: "new-password",
+    },
+    repository,
+  );
+
+  assert.ok(user.passwordHash);
+  assert.equal(await verifyPassword("new-password", user.passwordHash), true);
+});
+
+test("updateAccountCredentials rejects an incorrect current password", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("current-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  await assert.rejects(
+    () =>
+      updateAccountCredentials(
+        {
+          userId: "user-1",
+          currentPassword: "wrong-password",
+          username: "owner.next",
+        },
+        repository,
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message === "Current password is incorrect.",
+  );
+});
+
+test("updateAccountCredentials rejects duplicate usernames", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("current-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+    {
+      id: "user-2",
+      username: "taken-name",
+      passwordHash: await hashPassword("different-password"),
+      createdAt: new Date("2026-07-02T00:00:00Z"),
+    },
+  ]);
+
+  await assert.rejects(
+    () =>
+      updateAccountCredentials(
+        {
+          userId: "user-1",
+          currentPassword: "current-password",
+          username: "taken-name",
+        },
+        repository,
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message === "That username is already in use.",
+  );
+});
+
+test("updateAccountCredentials rejects invalid username and password updates", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("current-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  await assert.rejects(
+    () =>
+      updateAccountCredentials(
+        {
+          userId: "user-1",
+          currentPassword: "current-password",
+          username: "a",
+        },
+        repository,
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message ===
+        "Username must be 3 to 32 characters and use only letters, numbers, '.', '_', and '-'.",
+  );
+
+  await assert.rejects(
+    () =>
+      updateAccountCredentials(
+        {
+          userId: "user-1",
+          currentPassword: "current-password",
+          newPassword: "short",
+          confirmNewPassword: "short",
+        },
+        repository,
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message === "New password must be at least 8 characters.",
+  );
+
+  await assert.rejects(
+    () =>
+      updateAccountCredentials(
+        {
+          userId: "user-1",
+          currentPassword: "current-password",
+          newPassword: "new-password",
+          confirmNewPassword: "other-password",
+        },
+        repository,
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message === "New password and confirmation must match.",
+  );
 });
