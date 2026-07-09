@@ -10,6 +10,7 @@ test("app shell frame renders the summary region, grouped nav, and footer action
     <AppShellFrame
       pathname="/manage/accounts"
       username="owner"
+      footerActions={<button type="button">Report issue</button>}
       summary={{
         latestSnapshotLabel: "Latest snapshot Jul 9, 2026",
         netWorthLabel: "1,230,000 TWD",
@@ -25,6 +26,7 @@ test("app shell frame renders the summary region, grouped nav, and footer action
   assert.match(markup, /Dashboard/);
   assert.match(markup, /Data/);
   assert.match(markup, /Workflow/);
+  assert.match(markup, /Report issue/);
   assert.match(markup, /Settings/);
   assert.match(markup, /Sign out/);
   assert.match(markup, /nav-link nav-link-active/);

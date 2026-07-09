@@ -14,6 +14,7 @@ export type WorkspaceSummary = {
 
 type AppShellFrameProps = {
   children: ReactNode;
+  footerActions?: ReactNode;
   pathname: string;
   username: string;
   summary: WorkspaceSummary;
@@ -21,6 +22,7 @@ type AppShellFrameProps = {
 
 export function AppShellFrame({
   children,
+  footerActions,
   pathname,
   username,
   summary,
@@ -77,6 +79,7 @@ export function AppShellFrame({
         </nav>
 
         <div className="sidebar-footer stack">
+          {footerActions}
           {footerNavigation.map((section) => {
             const isActive =
               pathname === section.href || pathname.startsWith(`${section.href}/`);

@@ -4,6 +4,7 @@ import { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { formatUtcDateTime } from "@/lib/date-format";
+import { env } from "@/lib/env";
 import { createDashboardSummaryForUser } from "@/modules/dashboard";
 
 export default async function AuthenticatedLayout({
@@ -38,7 +39,11 @@ export default async function AuthenticatedLayout({
       };
 
   return (
-    <AppShell username={session.username} summary={summary}>
+    <AppShell
+      username={session.username}
+      summary={summary}
+      issueReportingEnabled={Boolean(env.githubIssueToken && env.githubIssueRepository)}
+    >
       {children}
     </AppShell>
   );
