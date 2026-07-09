@@ -195,6 +195,24 @@ const emptyManualPriceForm: ManualPriceFormState = {
   isValid: true,
 };
 
+export function getAssetSymbolGuidance(priceSourceType: AssetPriceSourceType) {
+  if (priceSourceType !== AssetPriceSourceType.AUTO) {
+    return null;
+  }
+
+  return "Use the Yahoo Finance symbol format, for example AAPL or 2330.TW.";
+}
+
+export function AssetSymbolGuidance({
+  priceSourceType,
+}: {
+  priceSourceType: AssetPriceSourceType;
+}) {
+  const guidance = getAssetSymbolGuidance(priceSourceType);
+
+  return guidance ? <p className="muted">{guidance}</p> : null;
+}
+
 export function ManagementSection({ section }: SectionProps) {
   if (section === "accounts") {
     return <AccountsManager />;
@@ -741,6 +759,7 @@ function AssetsManager() {
                 value={form.symbol}
                 onChange={(event) => setForm({ ...form, symbol: event.target.value })}
               />
+              <AssetSymbolGuidance priceSourceType={form.priceSourceType} />
             </label>
             <label className="field">
               <span>Price source</span>
