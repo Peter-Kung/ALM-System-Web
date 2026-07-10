@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import React from "react";
+import React, { act } from "react";
+import { createRoot, Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
+import { JSDOM } from "jsdom";
 
 import {
   AccountRecordCard,
@@ -14,6 +16,98 @@ import {
 } from "@/components/management-section";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { AccountType, AssetPriceSourceType, AssetType } from "@prisma/client";
+
+type DomGlobals = Pick<
+  typeof globalThis,
+  "document" | "Event" | "HTMLElement" | "HTMLInputElement" | "HTMLSelectElement" | "window"
+>;
+
+const reactActGlobal = globalThis as typeof globalThis & {
+  IS_REACT_ACT_ENVIRONMENT?: boolean;
+};
+
+reactActGlobal.IS_REACT_ACT_ENVIRONMENT = true;
+
+function createDom() {
+  const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost/manage/assets" });
+  const previousGlobals: Partial<DomGlobals> = {
+    document: globalThis.document,
+    Event: globalThis.Event,
+    HTMLElement: globalThis.HTMLElement,
+    HTMLInputElement: globalThis.HTMLInputElement,
+    HTMLSelectElement: globalThis.HTMLSelectElement,
+    window: globalThis.window,
+  };
+
+  globalThis.document = dom.window.document;
+  globalThis.Event = dom.window.Event;
+  globalThis.HTMLElement = dom.window.HTMLElement;
+  globalThis.HTMLInputElement = dom.window.HTMLInputElement;
+  globalThis.HTMLSelectElement = dom.window.HTMLSelectElement;
+  globalThis.window = dom.window as unknown as Window & typeof globalThis;
+
+  const rootElement = dom.window.document.getElementById("root");
+  assert.ok(rootElement);
+
+  const root = createRoot(rootElement);
+
+  return {
+    document: dom.window.document,
+    root,
+    restore() {
+      for (const [key, value] of Object.entries(previousGlobals)) {
+        if (value === undefined) {
+          delete (globalThis as Record<string, unknown>)[key];
+        } else {
+          (globalThis as Record<string, unknown>)[key] = value;
+        }
+      }
+      dom.window.close();
+    },
+  };
+}
+
+async function unmount(root: Root) {
+  await act(async () => {
+    root.unmount();
+  });
+}
+
+async function flushEffects() {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
+function changeSelect(select: HTMLSelectElement, value: string) {
+  const valueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+  valueSetter?.call(select, value);
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function getFieldControl<T extends HTMLElement>(document: Document, labelText: string) {
+  const label = Array.from(document.querySelectorAll("label.field")).find(
+    (candidate) => candidate.querySelector("span")?.textContent === labelText,
+  );
+  assert.ok(label, `Expected ${labelText} field to exist`);
+
+  const control = label.querySelector("input, select, textarea");
+  assert.ok(control, `Expected ${labelText} field to have a control`);
+
+  return control as T;
+}
+
+function getResourceCardByHeading(document: Document, headingText: string) {
+  const heading = Array.from(document.querySelectorAll(".resource-card h3")).find(
+    (candidate) => candidate.textContent === headingText,
+  );
+  assert.ok(heading, `Expected ${headingText} resource card to exist`);
+
+  const card = heading.closest(".resource-card");
+  assert.ok(card, `Expected ${headingText} heading to be inside a resource card`);
+
+  return card;
+}
 
 test("accounts management section renders the split editor and card-list template", () => {
   const markup = renderToStaticMarkup(
@@ -59,6 +153,137 @@ test("assets management section keeps the editor in the sticky form column", () 
   assert.match(markup, /management-form-column/);
   assert.match(markup, /Add asset/);
   assert.match(markup, /Existing assets/);
+});
+
+test("assets management flow saves and displays real estate assets", async () => {
+  const { document, root, restore } = createDom();
+  const previousFetch = globalThis.fetch;
+  const submittedPayloads: Array<Record<string, unknown>> = [];
+
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input);
+
+    if (url === "/api/assets" && init === undefined) {
+      return Response.json({
+        assets: [
+          {
+            id: "asset-house",
+            name: "House",
+            assetType: AssetType.STOCK,
+            symbol: null,
+            currency: "TWD",
+            priceSourceType: AssetPriceSourceType.AUTO,
+            isActive: true,
+            notes: null,
+          },
+        ],
+      });
+    }
+
+    if (url === "/api/assets/asset-house" && init?.method === "PUT") {
+      if (typeof init.body !== "string") {
+        throw new Error("Expected asset update request to submit a JSON body.");
+      }
+
+      const payload = JSON.parse(init.body) as Record<string, unknown>;
+      submittedPayloads.push(payload);
+
+      if (payload.assetType !== AssetType.REAL_ESTATE) {
+        return Response.json(
+          {
+            error:
+              "assetType must be one of: STOCK, ETF, FUND, CASH_EQUIVALENT, OTHER.",
+          },
+          { status: 400 },
+        );
+      }
+
+      return Response.json({
+        asset: {
+          id: "asset-house",
+          name: payload.name,
+          assetType: payload.assetType,
+          symbol: null,
+          currency: payload.currency,
+          priceSourceType: payload.priceSourceType,
+          isActive: true,
+          notes: null,
+        },
+      });
+    }
+
+    throw new Error(`Unexpected fetch request: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    await act(async () => {
+      root.render(
+        <WorkspaceMutationBoundary>
+          <ManagementSection section="assets" />
+        </WorkspaceMutationBoundary>,
+      );
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    assert.match(document.body.textContent ?? "", /House/);
+
+    const editButton = document.querySelector<HTMLButtonElement>(".asset-card-edit-button");
+    assert.ok(editButton);
+
+    await act(async () => {
+      editButton.click();
+    });
+
+    const form = document.querySelector("form");
+    const assetTypeSelect = getFieldControl<HTMLSelectElement>(document, "Asset type");
+    const priceSourceSelect = getFieldControl<HTMLSelectElement>(document, "Price source");
+    const submitButton = document.querySelector<HTMLButtonElement>('button[type="submit"]');
+
+    assert.ok(form);
+    assert.ok(assetTypeSelect);
+    assert.ok(priceSourceSelect);
+    assert.ok(submitButton);
+    assert.ok(
+      Array.from(assetTypeSelect.options).some(
+        (option) => option.value === AssetType.REAL_ESTATE && option.text === "Real Estate",
+      ),
+    );
+
+    await act(async () => {
+      changeSelect(assetTypeSelect, AssetType.REAL_ESTATE);
+      changeSelect(priceSourceSelect, AssetPriceSourceType.MANUAL);
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    assert.deepEqual(submittedPayloads, [
+      {
+        name: "House",
+        assetType: AssetType.REAL_ESTATE,
+        symbol: "",
+        currency: "TWD",
+        priceSourceType: AssetPriceSourceType.MANUAL,
+        isActive: true,
+        notes: "",
+      },
+    ]);
+    const houseCard = getResourceCardByHeading(document, "House");
+    assert.match(houseCard.textContent ?? "", /Real Estate/);
+    assert.doesNotMatch(
+      document.body.textContent ?? "",
+      /assetType must be one of: STOCK, ETF, FUND, CASH_EQUIVALENT, OTHER\./,
+    );
+  } finally {
+    globalThis.fetch = previousFetch;
+    await unmount(root);
+    restore();
+  }
 });
 
 test("asset symbol guidance only appears for auto-priced assets", () => {
