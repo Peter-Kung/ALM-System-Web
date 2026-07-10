@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/login-form";
 import { LoginPageFrame } from "@/components/login-page-frame";
+import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { getSessionFromCookies } from "@/lib/auth/session";
 
 export default async function LoginPage({
@@ -25,9 +26,11 @@ export default async function LoginPage({
 
   return (
     <main className="login-page">
-      <LoginPageFrame>
-        <LoginForm nextPath={nextPath} />
-      </LoginPageFrame>
+      <WorkspaceMutationBoundary>
+        <LoginPageFrame>
+          <LoginForm nextPath={nextPath} />
+        </LoginPageFrame>
+      </WorkspaceMutationBoundary>
     </main>
   );
 }

@@ -4,6 +4,8 @@ import React, { FormEvent, useState } from "react";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
+import { useWorkspaceMutation } from "@/components/workspace-mutation-boundary";
+
 export function LoginFormFields({
   nextPath,
   pending,
@@ -49,44 +51,46 @@ export function LoginFormFields({
 
 export function LoginForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
+  const { isPending, runWorkspaceMutation } = useWorkspaceMutation();
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
-    setError(null);
+    const form = event.currentTarget;
 
-    const formData = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        username: formData.get("username"),
-        password: formData.get("password"),
-        next: formData.get("next"),
-      }),
+    await runWorkspaceMutation(async () => {
+      setError(null);
+
+      const formData = new FormData(form);
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          username: formData.get("username"),
+          password: formData.get("password"),
+          next: formData.get("next"),
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        setError(payload?.error ?? "Unable to sign in.");
+        return;
+      }
+
+      const payload = (await response.json()) as { next?: string };
+      router.replace((payload.next || nextPath || "/dashboard") as Route);
+      router.refresh();
     });
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setError(payload?.error ?? "Unable to sign in.");
-      setPending(false);
-      return;
-    }
-
-    const payload = (await response.json()) as { next?: string };
-    router.replace((payload.next || nextPath || "/dashboard") as Route);
-    router.refresh();
   }
 
   return (
     <form className="card login-card stack" onSubmit={handleSubmit}>
-      <LoginFormFields nextPath={nextPath} pending={pending} error={error} />
+      <LoginFormFields nextPath={nextPath} pending={isPending} error={error} />
     </form>
   );
 }
