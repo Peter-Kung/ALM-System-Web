@@ -112,15 +112,21 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 2rem;
+  min-height: 100dvh;
 }
 
 .login-layout {
   display: grid;
   gap: 1.5rem;
-  width: min(76rem, 100%);
-  grid-template-columns: minmax(0, 1.45fr) minmax(21rem, 28rem);
-  grid-template-areas: "hero panel";
+  width: min(88rem, 100%);
+  grid-template-columns: minmax(0, 1fr) minmax(21rem, 28rem) minmax(0, 1fr);
+  grid-template-areas: "hero panel spacer";
   align-items: stretch;
+}
+
+.login-layout::after {
+  content: "";
+  grid-area: spacer;
 }
 
 .login-hero,
@@ -165,7 +171,7 @@ button:disabled {
 .login-highlight-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   margin-top: auto;
 }
 
@@ -835,9 +841,7 @@ button:disabled {
   }
 
   .login-layout {
-    grid-template-areas:
-      "panel"
-      "hero";
+    grid-template-areas: "panel";
   }
 
   .main-panel,
@@ -846,8 +850,13 @@ button:disabled {
   }
 
   .login-page {
-    place-items: stretch;
-    align-content: start;
+    place-items: center;
+    align-content: center;
+  }
+
+  .login-layout::after,
+  .login-hero {
+    display: none;
   }
 
   .sidebar {
