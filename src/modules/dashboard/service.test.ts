@@ -184,6 +184,40 @@ test("buildDashboardSummary summarizes the latest snapshot for the homepage", ()
   assert.deepEqual(summary.trendSeries, []);
 });
 
+test("buildDashboardSummary shows real estate as its own allocation category", () => {
+  const summary = buildDashboardSummary([
+    createSnapshot({
+      totalAssets: decimal("1500.00"),
+      investmentValue: decimal("1200.00"),
+      holdings: [
+        {
+          id: "holding-1",
+          snapshotId: "snapshot-1",
+          sourceHoldingId: "source-holding-1",
+          sourceAccountId: "source-account-1",
+          sourceAssetId: "source-asset-1",
+          accountName: "Property",
+          assetName: "Home",
+          assetType: AssetType.REAL_ESTATE,
+          symbol: null,
+          quantity: decimal("1.00"),
+          assetCurrency: "TWD",
+          priceAmount: decimal("1200.00"),
+          priceCurrency: "TWD",
+          priceRecordedAt: new Date("2026-07-08T00:00:00.000Z"),
+          fxRateToBase: decimal("1.00"),
+          marketValue: decimal("1200.00"),
+        },
+      ],
+    }),
+  ]);
+
+  assert.deepEqual(summary.allocation, [
+    { label: "Real Estate", value: "1200.00", shareOfAssets: "80.00" },
+    { label: "Cash", value: "300.00", shareOfAssets: "20.00" },
+  ]);
+});
+
 test("buildDashboardSummary reports trend deltas and incomplete issue messages", () => {
   const summary = buildDashboardSummary([
     createSnapshot({

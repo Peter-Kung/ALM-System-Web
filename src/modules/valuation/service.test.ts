@@ -109,6 +109,74 @@ test("buildValuationPreview returns a complete preview when prices and FX rates 
   assert.equal(preview.previewInput.holdings[0]?.priceAmount, "10");
 });
 
+test("buildValuationPreview preserves real estate asset classification", () => {
+  const preview = buildValuationPreview({
+    accounts: [
+      {
+        id: "account-1",
+        userId: "user-1",
+        name: "Property Account",
+        institutionName: "Personal",
+        accountType: AccountType.OTHER,
+        currency: "TWD",
+        cashBalance: new Prisma.Decimal("0"),
+        isActive: true,
+        notes: null,
+        createdAt: new Date("2026-07-07T00:00:00Z"),
+        updatedAt: new Date("2026-07-07T00:00:00Z"),
+      },
+    ],
+    holdings: [
+      {
+        id: "holding-1",
+        accountId: "account-1",
+        assetId: "asset-1",
+        quantity: new Prisma.Decimal("1"),
+        isActive: true,
+        notes: null,
+        createdAt: new Date("2026-07-07T00:00:00Z"),
+        updatedAt: new Date("2026-07-07T00:00:00Z"),
+        account: {
+          id: "account-1",
+          name: "Property Account",
+          institutionName: "Personal",
+          currency: "TWD",
+          isActive: true,
+        },
+        asset: {
+          id: "asset-1",
+          name: "Home",
+          assetType: AssetType.REAL_ESTATE,
+          symbol: null,
+          currency: "TWD",
+          isActive: true,
+        },
+      },
+    ],
+    liabilities: [],
+    latestPriceRecords: [
+      {
+        id: "price-1",
+        assetId: "asset-1",
+        sourceType: PriceRecordSourceType.MANUAL_ENTRY,
+        currency: "TWD",
+        price: new Prisma.Decimal("12000000"),
+        recordedAt: new Date("2026-07-07T00:00:00Z"),
+        isValid: true,
+        createdAt: new Date("2026-07-07T00:00:00Z"),
+        asset: { id: "asset-1" },
+      },
+    ],
+    fxRates: {},
+    generatedAt: new Date("2026-07-07T12:00:00Z"),
+  });
+
+  assert.equal(preview.status, "COMPLETE");
+  assert.equal(preview.totalAssets, "12000000.00");
+  assert.equal(preview.holdings[0]?.assetType, AssetType.REAL_ESTATE);
+  assert.equal(preview.previewInput.holdings[0]?.assetType, AssetType.REAL_ESTATE);
+});
+
 test("buildValuationPreview reports missing price and FX inputs as incomplete", () => {
   const preview = buildValuationPreview({
     accounts: [

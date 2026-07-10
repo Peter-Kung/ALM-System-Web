@@ -112,7 +112,10 @@ asset stores:
 - Notes
 
 Use `AUTO` pricing for assets that should participate in batch price refresh.
-Use `MANUAL` pricing for assets such as funds that need manual price entry.
+Use `MANUAL` pricing for assets such as funds or real estate estimates that
+need manual price entry. Real estate is a supported asset type; model one
+property as a real estate asset with a holding quantity of 1 and a manual price
+equal to the current estimate.
 
 ### 3. Create holdings
 

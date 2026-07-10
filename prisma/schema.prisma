@@ -19,6 +19,7 @@ enum AssetType {
   ETF
   FUND
   CASH_EQUIVALENT
+  REAL_ESTATE
   OTHER
 }
 
