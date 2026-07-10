@@ -73,7 +73,9 @@ export function DashboardTrendCard({
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: "#5b6157", fontSize: 12 }}
-                tickFormatter={(value) => formatCompactCurrency(Number(value), baseCurrency)}
+                tickFormatter={(value: number | string) =>
+                  formatCompactCurrency(Number(value), baseCurrency)
+                }
                 width={72}
               />
               <Tooltip content={<TrendTooltip baseCurrency={baseCurrency} />} />
