@@ -2,12 +2,14 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
+import { useWorkspaceMutation } from "@/components/workspace-mutation-boundary";
 import type {
   ValuationPreviewResult,
 } from "@/modules/valuation/types";
 import { VALUATION_BASE_CURRENCY } from "@/modules/valuation/types";
 
 export function ValuationManager() {
+  const { runWorkspaceMutation } = useWorkspaceMutation();
   const [currencies, setCurrencies] = useState<string[]>([]);
   const [fxRates, setFxRates] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<ValuationPreviewResult | null>(null);
@@ -59,41 +61,43 @@ export function ValuationManager() {
 
   async function handlePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsPreviewing(true);
-    setError(null);
-    setConfirmationMessage(null);
+    await runWorkspaceMutation(async () => {
+      setIsPreviewing(true);
+      setError(null);
+      setConfirmationMessage(null);
 
-    try {
-      const response = await fetch("/api/valuation/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fxRates: Object.fromEntries(
-            Object.entries(fxRates)
-              .map(([currency, value]) => [currency, value.trim()] as const)
-              .filter(([, value]) => value.length > 0),
-          ),
-        }),
-      });
+      try {
+        const response = await fetch("/api/valuation/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fxRates: Object.fromEntries(
+              Object.entries(fxRates)
+                .map(([currency, value]) => [currency, value.trim()] as const)
+                .filter(([, value]) => value.length > 0),
+            ),
+          }),
+        });
 
-      const payload = (await response.json()) as ValuationPreviewResult & {
-        error?: string;
-      };
+        const payload = (await response.json()) as ValuationPreviewResult & {
+          error?: string;
+        };
 
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to run valuation preview.");
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to run valuation preview.");
+        }
+
+        setPreview(payload);
+      } catch (previewError) {
+        setError(
+          previewError instanceof Error
+            ? previewError.message
+            : "Failed to run valuation preview.",
+        );
+      } finally {
+        setIsPreviewing(false);
       }
-
-      setPreview(payload);
-    } catch (previewError) {
-      setError(
-        previewError instanceof Error
-          ? previewError.message
-          : "Failed to run valuation preview.",
-      );
-    } finally {
-      setIsPreviewing(false);
-    }
+    });
   }
 
   async function handleConfirmSnapshot() {
@@ -106,48 +110,50 @@ export function ValuationManager() {
       return;
     }
 
-    setIsConfirming(true);
-    setError(null);
-    setConfirmationMessage(null);
+    await runWorkspaceMutation(async () => {
+      setIsConfirming(true);
+      setError(null);
+      setConfirmationMessage(null);
 
-    try {
-      const response = await fetch("/api/snapshots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          confirmationToken: preview.confirmationToken,
-        }),
-      });
+      try {
+        const response = await fetch("/api/snapshots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            confirmationToken: preview.confirmationToken,
+          }),
+        });
 
-      const payload = (await response.json()) as {
-        snapshot?: { id: string; status: string; snapshotAt: string };
-        error?: string;
-      };
+        const payload = (await response.json()) as {
+          snapshot?: { id: string; status: string; snapshotAt: string };
+          error?: string;
+        };
 
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to save snapshot.");
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to save snapshot.");
+        }
+
+        setConfirmationMessage(
+          `Snapshot saved for ${formatDateTime(payload.snapshot?.snapshotAt ?? preview.generatedAt)} with status ${payload.snapshot?.status ?? preview.status}. Open the Snapshots section to review the immutable detail.`,
+        );
+        setPreview((currentPreview) =>
+          currentPreview
+            ? {
+                ...currentPreview,
+                confirmationToken: undefined,
+              }
+            : currentPreview,
+        );
+      } catch (confirmationError) {
+        setError(
+          confirmationError instanceof Error
+            ? confirmationError.message
+            : "Failed to save snapshot.",
+        );
+      } finally {
+        setIsConfirming(false);
       }
-
-      setConfirmationMessage(
-        `Snapshot saved for ${formatDateTime(payload.snapshot?.snapshotAt ?? preview.generatedAt)} with status ${payload.snapshot?.status ?? preview.status}. Open the Snapshots section to review the immutable detail.`,
-      );
-      setPreview((currentPreview) =>
-        currentPreview
-          ? {
-              ...currentPreview,
-              confirmationToken: undefined,
-            }
-          : currentPreview,
-      );
-    } catch (confirmationError) {
-      setError(
-        confirmationError instanceof Error
-          ? confirmationError.message
-          : "Failed to save snapshot.",
-      );
-    } finally {
-      setIsConfirming(false);
-    }
+    });
   }
 
   return (
