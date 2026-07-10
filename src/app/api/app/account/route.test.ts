@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { patchAccountForUser } from "@/app/api/app/account/route";
 import { RepositoryValidationError } from "@/lib/repository-utils";
+import { patchAccountForUser } from "@/modules/auth";
 import type { AuthRepository } from "@/modules/auth/repository";
 import { hashPassword } from "@/modules/auth/service";
 

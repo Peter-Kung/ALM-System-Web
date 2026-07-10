@@ -6,20 +6,8 @@ import { RepositoryValidationError } from "@/lib/repository-utils";
 import {
   createAuthRepository,
   parseAccountUpdatePayload,
-  type UpdateAccountCredentialsInput,
-  updateAccountCredentials,
-  type AuthRepository,
+  patchAccountForUser,
 } from "@/modules/auth";
-
-export async function patchAccountForUser(
-  repository: AuthRepository,
-  input: UpdateAccountCredentialsInput,
-  clearSession: () => Promise<void>,
-) {
-  const user = await updateAccountCredentials(input, repository);
-  await clearSession();
-  return user;
-}
 
 export async function PATCH(request: NextRequest) {
   const { response, session } = await requireApiSession();
