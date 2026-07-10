@@ -120,3 +120,19 @@ export type ValuationPreviewResult = {
   previewInput: ValuationPreviewInput;
   confirmationToken?: string;
 };
+
+export type ValuationFxRateResult = {
+  currency: string;
+  baseCurrency: string;
+  status: "FETCHED" | "UNSUPPORTED" | "FAILED";
+  rateToBase: string | null;
+  provider: string | null;
+  fetchedAt: string | null;
+  error: string | null;
+};
+
+export type ValuationContext = {
+  baseCurrency: string;
+  requiredCurrencies: string[];
+  fxRateResults: ValuationFxRateResult[];
+};

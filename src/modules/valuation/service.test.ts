@@ -11,7 +11,8 @@ import {
 } from "@prisma/client";
 
 import { buildValuationPreview } from "./service";
-import { collectRequiredFxCurrencies } from "./service";
+import { buildValuationContext, collectRequiredFxCurrencies } from "./service";
+import { fetchFxRateToBase } from "./fx-rates";
 
 test("buildValuationPreview returns a complete preview when prices and FX rates are present", () => {
   const preview = buildValuationPreview({
@@ -318,6 +319,189 @@ test("collectRequiredFxCurrencies uses the latest valid price for active holding
   });
 
   assert.deepEqual(currencies, ["USD"]);
+});
+
+test("buildValuationContext returns fetched USD to TWD rate metadata", async () => {
+  const context = await buildValuationContext({
+    accounts: [
+      {
+        id: "account-1",
+        userId: "user-1",
+        name: "USD Cash",
+        institutionName: "My Bank",
+        accountType: AccountType.BANK,
+        currency: "USD",
+        cashBalance: new Prisma.Decimal("100"),
+        isActive: true,
+        notes: null,
+        createdAt: new Date("2026-07-07T00:00:00Z"),
+        updatedAt: new Date("2026-07-07T00:00:00Z"),
+      },
+    ],
+    holdings: [],
+    liabilities: [],
+    latestPriceRecords: [],
+    fetchFxRate: async (currency, baseCurrency) => ({
+      currency,
+      baseCurrency,
+      status: "FETCHED",
+      rateToBase: "31.25",
+      provider: "Test",
+      fetchedAt: "2026-07-10T00:00:00.000Z",
+      error: null,
+    }),
+  });
+
+  assert.deepEqual(context.requiredCurrencies, ["USD"]);
+  assert.deepEqual(context.fxRateResults, [
+    {
+      currency: "USD",
+      baseCurrency: "TWD",
+      status: "FETCHED",
+      rateToBase: "31.25",
+      provider: "Test",
+      fetchedAt: "2026-07-10T00:00:00.000Z",
+      error: null,
+    },
+  ]);
+});
+
+test("buildValuationContext keeps failed and unsupported rates non-blocking", async () => {
+  const context = await buildValuationContext({
+    accounts: [
+      {
+        id: "account-1",
+        userId: "user-1",
+        name: "USD Cash",
+        institutionName: "My Bank",
+        accountType: AccountType.BANK,
+        currency: "USD",
+        cashBalance: new Prisma.Decimal("100"),
+        isActive: true,
+        notes: null,
+        createdAt: new Date("2026-07-07T00:00:00Z"),
+        updatedAt: new Date("2026-07-07T00:00:00Z"),
+      },
+      {
+        id: "account-2",
+        userId: "user-1",
+        name: "EUR Cash",
+        institutionName: "My Bank",
+        accountType: AccountType.BANK,
+        currency: "EUR",
+        cashBalance: new Prisma.Decimal("100"),
+        isActive: true,
+        notes: null,
+        createdAt: new Date("2026-07-07T00:00:00Z"),
+        updatedAt: new Date("2026-07-07T00:00:00Z"),
+      },
+    ],
+    holdings: [],
+    liabilities: [],
+    latestPriceRecords: [],
+    fetchFxRate: async (currency, baseCurrency) =>
+      currency === "USD"
+        ? {
+            currency,
+            baseCurrency,
+            status: "FAILED",
+            rateToBase: null,
+            provider: "Test",
+            fetchedAt: null,
+            error: "Rate source unavailable.",
+          }
+        : {
+            currency,
+            baseCurrency,
+            status: "UNSUPPORTED",
+            rateToBase: null,
+            provider: null,
+            fetchedAt: null,
+            error: "No live rate source is configured for EUR to TWD.",
+          },
+  });
+
+  assert.deepEqual(context.requiredCurrencies, ["EUR", "USD"]);
+  assert.deepEqual(
+    context.fxRateResults.map((result) => [result.currency, result.status, result.error]),
+    [
+      ["EUR", "UNSUPPORTED", "No live rate source is configured for EUR to TWD."],
+      ["USD", "FAILED", "Rate source unavailable."],
+    ],
+  );
+});
+
+test("fetchFxRateToBase returns a USD to TWD Yahoo Finance rate", async () => {
+  const result = await fetchFxRateToBase("USD", "TWD", {
+    fetchFn: async (url) => {
+      assert.match(String(url), /USDTWD%3DX/);
+      return new Response(
+        JSON.stringify({
+          chart: {
+            result: [
+              {
+                meta: {
+                  regularMarketPrice: 31.125,
+                  regularMarketTime: 1783641600,
+                },
+              },
+            ],
+          },
+        }),
+        { status: 200 },
+      );
+    },
+  });
+
+  assert.deepEqual(result, {
+    currency: "USD",
+    baseCurrency: "TWD",
+    status: "FETCHED",
+    rateToBase: "31.125",
+    provider: "Yahoo Finance",
+    fetchedAt: "2026-07-10T00:00:00.000Z",
+    error: null,
+  });
+});
+
+test("fetchFxRateToBase marks USD failures and unsupported currencies", async () => {
+  const failed = await fetchFxRateToBase("USD", "TWD", {
+    fetchFn: async () => new Response("{}", { status: 503 }),
+  });
+  const unsupported = await fetchFxRateToBase("EUR", "TWD", {
+    fetchFn: async () => {
+      throw new Error("unexpected fetch");
+    },
+  });
+
+  assert.equal(failed.status, "FAILED");
+  assert.equal(failed.rateToBase, null);
+  assert.match(failed.error ?? "", /503/);
+  assert.deepEqual(unsupported, {
+    currency: "EUR",
+    baseCurrency: "TWD",
+    status: "UNSUPPORTED",
+    rateToBase: null,
+    provider: null,
+    fetchedAt: null,
+    error: "No live rate source is configured for EUR to TWD.",
+  });
+});
+
+test("fetchFxRateToBase times out stalled USD to TWD requests", async () => {
+  const result = await fetchFxRateToBase("USD", "TWD", {
+    timeoutMs: 1,
+    fetchFn: async (_url, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(init.signal?.reason);
+        });
+      }),
+  });
+
+  assert.equal(result.status, "FAILED");
+  assert.equal(result.rateToBase, null);
+  assert.match(result.error ?? "", /timed out/);
 });
 
 test("buildValuationPreview keeps account holdings totals aligned with the summary", () => {

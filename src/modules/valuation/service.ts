@@ -16,8 +16,11 @@ import { createHoldingRepository } from "@/modules/holdings";
 import { createLiabilityRepository } from "@/modules/liabilities";
 import { createPriceRecordRepository } from "@/modules/prices";
 import { RepositoryValidationError } from "@/lib/repository-utils";
+import { fetchFxRateToBase } from "@/modules/valuation/fx-rates";
 import {
   VALUATION_BASE_CURRENCY,
+  type ValuationContext,
+  type ValuationFxRateResult,
   type ValuationPreviewIssue,
   type ValuationPreviewResult,
 } from "@/modules/valuation/types";
@@ -43,6 +46,18 @@ type BuildValuationPreviewInput = {
   fxRates?: Record<string, string | number>;
   generatedAt?: Date;
   baseCurrency?: string;
+};
+
+type BuildValuationContextInput = {
+  accounts: Account[];
+  holdings: HoldingWithRelations[];
+  liabilities: LiabilityWithPaymentAccount[];
+  latestPriceRecords: PriceRecordWithAsset[];
+  baseCurrency?: string;
+  fetchFxRate?: (
+    currency: string,
+    baseCurrency: string,
+  ) => Promise<ValuationFxRateResult>;
 };
 
 const accountRepository = createAccountRepository();
@@ -146,14 +161,40 @@ export async function createValuationContextForUser(userId: string) {
     priceRecordRepository.listLatestByUser(userId),
   ]);
 
+  return buildValuationContext({
+    accounts,
+    holdings,
+    liabilities,
+    latestPriceRecords,
+  });
+}
+
+export async function buildValuationContext({
+  accounts,
+  holdings,
+  liabilities,
+  latestPriceRecords,
+  baseCurrency = VALUATION_BASE_CURRENCY,
+  fetchFxRate = fetchFxRateToBase,
+}: BuildValuationContextInput): Promise<ValuationContext> {
+  const normalizedBaseCurrency = normalizeCurrency(baseCurrency);
+  const requiredCurrencies = collectRequiredFxCurrencies({
+    accounts,
+    holdings,
+    liabilities,
+    latestPriceRecords,
+    baseCurrency: normalizedBaseCurrency,
+  });
+  const fxRateResults = await Promise.all(
+    requiredCurrencies.map((currency) =>
+      fetchFxRate(currency, normalizedBaseCurrency),
+    ),
+  );
+
   return {
-    baseCurrency: VALUATION_BASE_CURRENCY,
-    requiredCurrencies: collectRequiredFxCurrencies({
-      accounts,
-      holdings,
-      liabilities,
-      latestPriceRecords,
-    }),
+    baseCurrency: normalizedBaseCurrency,
+    requiredCurrencies,
+    fxRateResults,
   };
 }
 
