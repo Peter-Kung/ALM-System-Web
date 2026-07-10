@@ -1,9 +1,12 @@
 "use client";
 
+import React from "react";
 import { FormEvent, useEffect, useState } from "react";
 
 import { useWorkspaceMutation } from "@/components/workspace-mutation-boundary";
 import type {
+  ValuationContext,
+  ValuationFxRateResult,
   ValuationPreviewResult,
 } from "@/modules/valuation/types";
 import { VALUATION_BASE_CURRENCY } from "@/modules/valuation/types";
@@ -12,6 +15,7 @@ export function ValuationManager() {
   const { runWorkspaceMutation } = useWorkspaceMutation();
   const [currencies, setCurrencies] = useState<string[]>([]);
   const [fxRates, setFxRates] = useState<Record<string, string>>({});
+  const [fxRateResults, setFxRateResults] = useState<Record<string, ValuationFxRateResult>>({});
   const [preview, setPreview] = useState<ValuationPreviewResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -29,9 +33,7 @@ export function ValuationManager() {
 
     try {
       const response = await fetch("/api/valuation/preview");
-      const payload = (await response.json()) as {
-        baseCurrency?: string;
-        requiredCurrencies?: string[];
+      const payload = (await response.json()) as Partial<ValuationContext> & {
         error?: string;
       };
 
@@ -40,11 +42,23 @@ export function ValuationManager() {
       }
 
       const nextCurrencies = payload.requiredCurrencies ?? [];
+      const nextFxRateResults = Object.fromEntries(
+        (payload.fxRateResults ?? []).map((result) => [result.currency, result] as const),
+      );
 
       setCurrencies(nextCurrencies);
+      setFxRateResults(nextFxRateResults);
       setFxRates((currentRates) =>
         nextCurrencies.reduce<Record<string, string>>((nextRates, currency) => {
-          nextRates[currency] = currentRates[currency] ?? "";
+          const currentValue = currentRates[currency] ?? "";
+          const fetchedRate = nextFxRateResults[currency];
+
+          nextRates[currency] =
+            currentValue.trim().length > 0
+              ? currentValue
+              : fetchedRate?.status === "FETCHED" && fetchedRate.rateToBase
+                ? fetchedRate.rateToBase
+                : "";
           return nextRates;
         }, {}),
       );
@@ -61,6 +75,17 @@ export function ValuationManager() {
 
   async function handlePreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const submittedFxRates = Object.fromEntries(
+      currencies
+        .map((currency) => {
+          const value = formData.get(`fxRate.${currency}`);
+
+          return [currency, typeof value === "string" ? value.trim() : ""] as const;
+        })
+        .filter(([, value]) => value.length > 0),
+    );
+
     await runWorkspaceMutation(async () => {
       setIsPreviewing(true);
       setError(null);
@@ -71,11 +96,7 @@ export function ValuationManager() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            fxRates: Object.fromEntries(
-              Object.entries(fxRates)
-                .map(([currency, value]) => [currency, value.trim()] as const)
-                .filter(([, value]) => value.length > 0),
-            ),
+            fxRates: submittedFxRates,
           }),
         });
 
@@ -186,24 +207,32 @@ export function ValuationManager() {
             </div>
           ) : null}
           {!isLoading
-            ? currencies.map((currency) => (
-                <label key={currency} className="field">
-                  <span>{currency} to {VALUATION_BASE_CURRENCY}</span>
-                  <input
-                    type="number"
-                    step="0.0001"
-                    min="0.0001"
-                    value={fxRates[currency] ?? ""}
-                    onChange={(event) =>
-                      setFxRates((currentRates) => ({
-                        ...currentRates,
-                        [currency]: event.target.value,
-                      }))
-                    }
-                    placeholder={`1 ${currency} = ? ${VALUATION_BASE_CURRENCY}`}
-                  />
-                </label>
-              ))
+            ? currencies.map((currency) => {
+                const rateResult = fxRateResults[currency];
+
+                return (
+                  <label key={currency} className="field">
+                    <span>{currency} to {VALUATION_BASE_CURRENCY}</span>
+                    <input
+                      name={`fxRate.${currency}`}
+                      type="number"
+                      step="0.0001"
+                      min="0.0001"
+                      value={fxRates[currency] ?? ""}
+                      onChange={(event) =>
+                        setFxRates((currentRates) => ({
+                          ...currentRates,
+                          [currency]: event.target.value,
+                        }))
+                      }
+                      placeholder={`1 ${currency} = ? ${VALUATION_BASE_CURRENCY}`}
+                    />
+                    {rateResult ? (
+                      <span className="muted">{formatFxRateResult(rateResult)}</span>
+                    ) : null}
+                  </label>
+                );
+              })
             : null}
           {error ? <p className="error">{error}</p> : null}
           {confirmationMessage ? <p className="muted">{confirmationMessage}</p> : null}
@@ -363,6 +392,18 @@ export function ValuationManager() {
       </div>
     </section>
   );
+}
+
+function formatFxRateResult(result: ValuationFxRateResult) {
+  if (result.status === "FETCHED" && result.rateToBase) {
+    return `Prefilled from ${result.provider ?? "live exchange rates"}.`;
+  }
+
+  if (result.status === "UNSUPPORTED") {
+    return result.error ?? `No live rate source is configured for ${result.currency}.`;
+  }
+
+  return result.error ?? `Could not fetch ${result.currency} to ${result.baseCurrency}.`;
 }
 
 function formatDateTime(value: string) {
