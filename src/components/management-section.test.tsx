@@ -4,6 +4,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  AccountRecordCard,
   AssetSymbolGuidance,
   ManagementSection,
   formatCurrencyAmount,
@@ -11,7 +12,7 @@ import {
   getAccountActionLabel,
 } from "@/components/management-section";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
-import { AssetPriceSourceType } from "@prisma/client";
+import { AccountType, AssetPriceSourceType } from "@prisma/client";
 
 test("accounts management section renders the split editor and card-list template", () => {
   const markup = renderToStaticMarkup(
@@ -66,4 +67,52 @@ test("getAccountActionLabel includes institution context for duplicate account n
     getAccountActionLabel(account, "activate"),
     "Mark Checking at North Bank active",
   );
+});
+
+test("account cards expose archive actions and inactive-state rendering", () => {
+  const activeMarkup = renderToStaticMarkup(
+    <AccountRecordCard
+      account={{
+        id: "account-1",
+        name: "Checking",
+        institutionName: "North Bank",
+        accountType: AccountType.BANK,
+        currency: "USD",
+        cashBalance: "1200.50",
+        isActive: true,
+        notes: null,
+      }}
+      isUpdating={false}
+      onEdit={() => undefined}
+      onToggleStatus={() => undefined}
+    />,
+  );
+
+  assert.match(activeMarkup, /Checking/);
+  assert.match(activeMarkup, /North Bank/);
+  assert.match(activeMarkup, /Active/);
+  assert.match(activeMarkup, /Archive/);
+  assert.match(activeMarkup, /aria-label="Archive Checking at North Bank"/);
+
+  const inactiveMarkup = renderToStaticMarkup(
+    <AccountRecordCard
+      account={{
+        id: "account-1",
+        name: "Checking",
+        institutionName: "North Bank",
+        accountType: AccountType.BANK,
+        currency: "USD",
+        cashBalance: "1200.50",
+        isActive: false,
+        notes: null,
+      }}
+      isUpdating={false}
+      onEdit={() => undefined}
+      onToggleStatus={() => undefined}
+    />,
+  );
+
+  assert.match(inactiveMarkup, /Inactive/);
+  assert.match(inactiveMarkup, /Mark active/);
+  assert.doesNotMatch(inactiveMarkup, /Archived/);
 });

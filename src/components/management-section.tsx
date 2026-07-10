@@ -13,7 +13,7 @@ import { SnapshotManager } from "@/components/snapshot-manager";
 import { ValuationManager } from "@/components/valuation-manager";
 import { useWorkspaceMutation } from "@/components/workspace-mutation-boundary";
 
-type AccountRecord = {
+export type AccountRecord = {
   id: string;
   name: string;
   institutionName: string;
@@ -290,6 +290,74 @@ export function getAccountActionLabel(
   }
 }
 
+export function AccountRecordCard({
+  account,
+  isUpdating,
+  onEdit,
+  onToggleStatus,
+}: {
+  account: AccountRecord;
+  isUpdating: boolean;
+  onEdit: (account: AccountRecord) => void;
+  onToggleStatus: (account: AccountRecord, isActive: boolean) => void;
+}) {
+  return (
+    <article className="resource-card resource-card-account stack">
+      <div className="section-heading">
+        <div>
+          <h3>{account.name}</h3>
+          <p className="muted">{account.institutionName}</p>
+        </div>
+        <span
+          className={`status-pill ${
+            account.isActive ? "status-complete" : "status-incomplete"
+          }`}
+        >
+          {account.isActive ? "Active" : "Inactive"}
+        </span>
+      </div>
+      <div className="account-card-balance">
+        <p className="eyebrow">Cash balance</p>
+        <strong>{formatCurrencyAmount(account.cashBalance, account.currency)}</strong>
+      </div>
+      <dl className="detail-grid detail-grid-accounts">
+        <div>
+          <dt>Account type</dt>
+          <dd>{formatEnumLabel(account.accountType)}</dd>
+        </div>
+        <div>
+          <dt>Currency</dt>
+          <dd>{account.currency}</dd>
+        </div>
+      </dl>
+      {account.notes ? <p className="muted">{account.notes}</p> : null}
+      <div className="account-card-actions">
+        <button
+          type="button"
+          aria-label={getAccountActionLabel(account, "edit")}
+          className="ghost-button compact-button"
+          onClick={() => onEdit(account)}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          aria-label={
+            account.isActive
+              ? getAccountActionLabel(account, "archive")
+              : getAccountActionLabel(account, "activate")
+          }
+          className="ghost-button compact-button"
+          disabled={isUpdating}
+          onClick={() => onToggleStatus(account, !account.isActive)}
+        >
+          {isUpdating ? "Updating..." : account.isActive ? "Archive" : "Mark active"}
+        </button>
+      </div>
+    </article>
+  );
+}
+
 function AccountsManager() {
   const { runWorkspaceMutation } = useWorkspaceMutation();
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
@@ -562,59 +630,13 @@ function AccountsManager() {
             <div className="placeholder">No accounts yet. Create the first account.</div>
           ) : null}
           {accounts.map((account) => (
-            <article key={account.id} className="resource-card resource-card-account stack">
-              <div className="section-heading">
-                <div>
-                  <h3>{account.name}</h3>
-                  <p className="muted">{account.institutionName}</p>
-                </div>
-                <span className={`status-pill ${account.isActive ? "status-complete" : "status-incomplete"}`}>
-                  {account.isActive ? "Active" : "Archived"}
-                </span>
-              </div>
-              <div className="account-card-balance">
-                <p className="eyebrow">Cash balance</p>
-                <strong>{formatCurrencyAmount(account.cashBalance, account.currency)}</strong>
-              </div>
-              <dl className="detail-grid detail-grid-accounts">
-                <div>
-                  <dt>Account type</dt>
-                  <dd>{formatEnumLabel(account.accountType)}</dd>
-                </div>
-                <div>
-                  <dt>Currency</dt>
-                  <dd>{account.currency}</dd>
-                </div>
-              </dl>
-              {account.notes ? <p className="muted">{account.notes}</p> : null}
-              <div className="account-card-actions">
-                <button
-                  type="button"
-                  aria-label={getAccountActionLabel(account, "edit")}
-                  className="ghost-button compact-button"
-                  onClick={() => beginEdit(account)}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  aria-label={
-                    account.isActive
-                      ? getAccountActionLabel(account, "archive")
-                      : getAccountActionLabel(account, "activate")
-                  }
-                  className="ghost-button compact-button"
-                  disabled={isTogglingId === account.id}
-                  onClick={() => toggleAccountStatus(account, !account.isActive)}
-                >
-                  {isTogglingId === account.id
-                    ? "Updating..."
-                    : account.isActive
-                      ? "Archive"
-                      : "Mark active"}
-                </button>
-              </div>
-            </article>
+            <AccountRecordCard
+              key={account.id}
+              account={account}
+              isUpdating={isTogglingId === account.id}
+              onEdit={beginEdit}
+              onToggleStatus={toggleAccountStatus}
+            />
           ))}
         </section>
       </div>
