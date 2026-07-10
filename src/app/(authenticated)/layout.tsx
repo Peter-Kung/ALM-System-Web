@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ReactNode } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { createDashboardSummaryForUser } from "@/modules/dashboard";
 import type { DashboardSidebarSummary } from "@/modules/dashboard/service";
@@ -23,7 +24,7 @@ export default async function AuthenticatedLayout({
       username={session.username}
       summary={buildWorkspaceSummary(dashboard.sidebarSummary)}
     >
-      {children}
+      <WorkspaceMutationBoundary>{children}</WorkspaceMutationBoundary>
     </AppShell>
   );
 }

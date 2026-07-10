@@ -352,7 +352,50 @@ button:disabled {
 }
 
 .main-panel-inner {
+  position: relative;
   min-height: calc(100vh - 3rem);
+}
+
+.workspace-mutation-shell {
+  position: relative;
+  min-height: 100%;
+}
+
+.workspace-mutation-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(244, 239, 228, 0.76);
+  backdrop-filter: blur(5px);
+  z-index: 20;
+}
+
+.workspace-mutation-overlay-card {
+  width: min(26rem, 100%);
+  padding: 1.5rem;
+  border: 1px solid rgba(67, 82, 52, 0.14);
+  border-radius: 24px;
+  background: rgba(255, 253, 249, 0.96);
+  box-shadow: var(--shadow);
+  align-items: center;
+  text-align: center;
+}
+
+.workspace-mutation-spinner {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  border: 0.3rem solid rgba(125, 143, 90, 0.16);
+  border-top-color: var(--accent-strong);
+  animation: workspace-spinner 0.85s linear infinite;
+}
+
+@keyframes workspace-spinner {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .card,
