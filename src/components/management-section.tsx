@@ -11,6 +11,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { SnapshotManager } from "@/components/snapshot-manager";
 import { ValuationManager } from "@/components/valuation-manager";
+import { useWorkspaceMutation } from "@/components/workspace-mutation-boundary";
 
 type AccountRecord = {
   id: string;
@@ -290,6 +291,7 @@ export function getAccountActionLabel(
 }
 
 function AccountsManager() {
+  const { runWorkspaceMutation } = useWorkspaceMutation();
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
   const [form, setForm] = useState<AccountFormState>(emptyAccountForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -324,45 +326,47 @@ function AccountsManager() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSaving(true);
-    setError(null);
+    await runWorkspaceMutation(async () => {
+      setIsSaving(true);
+      setError(null);
 
-    try {
-      const response = await fetch(
-        editingId ? `/api/accounts/${editingId}` : "/api/accounts",
-        {
-          method: editingId ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...form,
-          }),
-        },
-      );
+      try {
+        const response = await fetch(
+          editingId ? `/api/accounts/${editingId}` : "/api/accounts",
+          {
+            method: editingId ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...form,
+            }),
+          },
+        );
 
-      const payload = (await response.json()) as {
-        account?: AccountRecord;
-        error?: string;
-      };
+        const payload = (await response.json()) as {
+          account?: AccountRecord;
+          error?: string;
+        };
 
-      if (!response.ok || !payload.account) {
-        throw new Error(payload.error ?? "Failed to save account.");
+        if (!response.ok || !payload.account) {
+          throw new Error(payload.error ?? "Failed to save account.");
+        }
+
+        const nextAccount = payload.account;
+
+        setAccounts((currentAccounts) =>
+          editingId
+            ? currentAccounts.map((account) =>
+                account.id === nextAccount.id ? nextAccount : account,
+              )
+            : [...currentAccounts, nextAccount],
+        );
+        reset();
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : "Failed to save account.");
+      } finally {
+        setIsSaving(false);
       }
-
-      const nextAccount = payload.account;
-
-      setAccounts((currentAccounts) =>
-        editingId
-          ? currentAccounts.map((account) =>
-              account.id === nextAccount.id ? nextAccount : account,
-            )
-          : [...currentAccounts, nextAccount],
-      );
-      reset();
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to save account.");
-    } finally {
-      setIsSaving(false);
-    }
+    });
   }
 
   function beginEdit(account: AccountRecord) {
@@ -384,45 +388,47 @@ function AccountsManager() {
   }
 
   async function toggleAccountStatus(account: AccountRecord, isActive: boolean) {
-    setIsTogglingId(account.id);
-    setError(null);
+    await runWorkspaceMutation(async () => {
+      setIsTogglingId(account.id);
+      setError(null);
 
-    try {
-      const response = await fetch(`/api/accounts/${account.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          isActive,
-        }),
-      });
+      try {
+        const response = await fetch(`/api/accounts/${account.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            isActive,
+          }),
+        });
 
-      const payload = (await response.json()) as {
-        account?: AccountRecord;
-        error?: string;
-      };
+        const payload = (await response.json()) as {
+          account?: AccountRecord;
+          error?: string;
+        };
 
-      if (!response.ok || !payload.account) {
-        throw new Error(payload.error ?? "Failed to update account status.");
+        if (!response.ok || !payload.account) {
+          throw new Error(payload.error ?? "Failed to update account status.");
+        }
+
+        setAccounts((currentAccounts) =>
+          currentAccounts.map((currentAccount) =>
+            currentAccount.id === payload.account?.id ? payload.account : currentAccount,
+          ),
+        );
+
+        if (editingId === account.id) {
+          setForm((currentForm) => ({ ...currentForm, isActive }));
+        }
+      } catch (statusError) {
+        setError(
+          statusError instanceof Error
+            ? statusError.message
+            : "Failed to update account status.",
+        );
+      } finally {
+        setIsTogglingId(null);
       }
-
-      setAccounts((currentAccounts) =>
-        currentAccounts.map((currentAccount) =>
-          currentAccount.id === payload.account?.id ? payload.account : currentAccount,
-        ),
-      );
-
-      if (editingId === account.id) {
-        setForm((currentForm) => ({ ...currentForm, isActive }));
-      }
-    } catch (statusError) {
-      setError(
-        statusError instanceof Error
-          ? statusError.message
-          : "Failed to update account status.",
-      );
-    } finally {
-      setIsTogglingId(null);
-    }
+    });
   }
 
   const activeCount = accounts.filter((account) => account.isActive).length;
@@ -617,6 +623,7 @@ function AccountsManager() {
 }
 
 function AssetsManager() {
+  const { runWorkspaceMutation } = useWorkspaceMutation();
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [form, setForm] = useState<AssetFormState>(emptyAssetForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -650,35 +657,37 @@ function AssetsManager() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSaving(true);
-    setError(null);
+    await runWorkspaceMutation(async () => {
+      setIsSaving(true);
+      setError(null);
 
-    try {
-      const response = await fetch(editingId ? `/api/assets/${editingId}` : "/api/assets", {
-        method: editingId ? "PUT" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      try {
+        const response = await fetch(editingId ? `/api/assets/${editingId}` : "/api/assets", {
+          method: editingId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
 
-      const payload = (await response.json()) as { asset?: AssetRecord; error?: string };
+        const payload = (await response.json()) as { asset?: AssetRecord; error?: string };
 
-      if (!response.ok || !payload.asset) {
-        throw new Error(payload.error ?? "Failed to save asset.");
+        if (!response.ok || !payload.asset) {
+          throw new Error(payload.error ?? "Failed to save asset.");
+        }
+
+        const nextAsset = payload.asset;
+
+        setAssets((currentAssets) =>
+          editingId
+            ? currentAssets.map((asset) => (asset.id === nextAsset.id ? nextAsset : asset))
+            : [...currentAssets, nextAsset],
+        );
+        reset();
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : "Failed to save asset.");
+      } finally {
+        setIsSaving(false);
       }
-
-      const nextAsset = payload.asset;
-
-      setAssets((currentAssets) =>
-        editingId
-          ? currentAssets.map((asset) => (asset.id === nextAsset.id ? nextAsset : asset))
-          : [...currentAssets, nextAsset],
-      );
-      reset();
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to save asset.");
-    } finally {
-      setIsSaving(false);
-    }
+    });
   }
 
   function beginEdit(asset: AssetRecord) {
@@ -852,6 +861,7 @@ function AssetsManager() {
 }
 
 function HoldingsManager() {
+  const { runWorkspaceMutation } = useWorkspaceMutation();
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [holdings, setHoldings] = useState<HoldingRecord[]>([]);
@@ -920,46 +930,51 @@ function HoldingsManager() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSaving(true);
-    setError(null);
+    await runWorkspaceMutation(async () => {
+      setIsSaving(true);
+      setError(null);
 
-    try {
-      const response = await fetch(
-        editingId ? `/api/holdings/${editingId}` : "/api/holdings",
-        {
-          method: editingId ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...form,
-          }),
-        },
-      );
+      try {
+        const response = await fetch(
+          editingId ? `/api/holdings/${editingId}` : "/api/holdings",
+          {
+            method: editingId ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...form,
+            }),
+          },
+        );
 
-      const payload = (await response.json()) as { holding?: HoldingRecord; error?: string };
+        const payload = (await response.json()) as { holding?: HoldingRecord; error?: string };
 
-      if (!response.ok || !payload.holding) {
-        throw new Error(payload.error ?? "Failed to save holding.");
+        if (!response.ok || !payload.holding) {
+          throw new Error(payload.error ?? "Failed to save holding.");
+        }
+
+        const nextHolding = {
+          ...payload.holding,
+          account:
+            accounts.find((account) => account.id === payload.holding?.accountId) ??
+            payload.holding.account,
+          asset:
+            assets.find((asset) => asset.id === payload.holding?.assetId) ?? payload.holding.asset,
+        };
+
+        setHoldings((currentHoldings) =>
+          editingId
+            ? currentHoldings.map((holding) =>
+                holding.id === nextHolding.id ? nextHolding : holding,
+              )
+            : [...currentHoldings, nextHolding],
+        );
+        reset();
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : "Failed to save holding.");
+      } finally {
+        setIsSaving(false);
       }
-
-      const nextHolding = {
-        ...payload.holding,
-        account: accounts.find((account) => account.id === payload.holding?.accountId) ?? payload.holding.account,
-        asset: assets.find((asset) => asset.id === payload.holding?.assetId) ?? payload.holding.asset,
-      };
-
-      setHoldings((currentHoldings) =>
-        editingId
-          ? currentHoldings.map((holding) =>
-              holding.id === nextHolding.id ? nextHolding : holding,
-            )
-          : [...currentHoldings, nextHolding],
-      );
-      reset();
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Failed to save holding.");
-    } finally {
-      setIsSaving(false);
-    }
+    });
   }
 
   function beginEdit(holding: HoldingRecord) {
@@ -1123,6 +1138,7 @@ function HoldingsManager() {
 }
 
 function LiabilitiesManager() {
+  const { runWorkspaceMutation } = useWorkspaceMutation();
   const [accounts, setAccounts] = useState<AccountRecord[]>([]);
   const [liabilities, setLiabilities] = useState<LiabilityRecord[]>([]);
   const [form, setForm] = useState<LiabilityFormState>(emptyLiabilityForm);
@@ -1176,45 +1192,47 @@ function LiabilitiesManager() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSaving(true);
-    setError(null);
+    await runWorkspaceMutation(async () => {
+      setIsSaving(true);
+      setError(null);
 
-    try {
-      const response = await fetch(
-        editingId ? `/api/liabilities/${editingId}` : "/api/liabilities",
-        {
-          method: editingId ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
-        },
-      );
+      try {
+        const response = await fetch(
+          editingId ? `/api/liabilities/${editingId}` : "/api/liabilities",
+          {
+            method: editingId ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(form),
+          },
+        );
 
-      const payload = (await response.json()) as {
-        liability?: LiabilityRecord;
-        error?: string;
-      };
+        const payload = (await response.json()) as {
+          liability?: LiabilityRecord;
+          error?: string;
+        };
 
-      if (!response.ok || !payload.liability) {
-        throw new Error(payload.error ?? "Failed to save liability.");
+        if (!response.ok || !payload.liability) {
+          throw new Error(payload.error ?? "Failed to save liability.");
+        }
+
+        const nextLiability = payload.liability;
+
+        setLiabilities((currentLiabilities) =>
+          editingId
+            ? currentLiabilities.map((liability) =>
+                liability.id === nextLiability.id ? nextLiability : liability,
+              )
+            : [...currentLiabilities, nextLiability],
+        );
+        reset();
+      } catch (saveError) {
+        setError(
+          saveError instanceof Error ? saveError.message : "Failed to save liability.",
+        );
+      } finally {
+        setIsSaving(false);
       }
-
-      const nextLiability = payload.liability;
-
-      setLiabilities((currentLiabilities) =>
-        editingId
-          ? currentLiabilities.map((liability) =>
-              liability.id === nextLiability.id ? nextLiability : liability,
-            )
-          : [...currentLiabilities, nextLiability],
-      );
-      reset();
-    } catch (saveError) {
-      setError(
-        saveError instanceof Error ? saveError.message : "Failed to save liability.",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    });
   }
 
   function beginEdit(liability: LiabilityRecord) {
@@ -1482,6 +1500,7 @@ function LiabilitiesManager() {
 }
 
 function PricesManager() {
+  const { runWorkspaceMutation } = useWorkspaceMutation();
   const [assets, setAssets] = useState<AssetRecord[]>([]);
   const [priceRecords, setPriceRecords] = useState<PriceRecord[]>([]);
   const [manualForm, setManualForm] = useState<ManualPriceFormState>(emptyManualPriceForm);
@@ -1549,72 +1568,78 @@ function PricesManager() {
 
   async function handleManualSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSavingManualPrice(true);
-    setError(null);
+    await runWorkspaceMutation(async () => {
+      setIsSavingManualPrice(true);
+      setError(null);
 
-    try {
-      const response = await fetch("/api/prices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...manualForm,
-          price: manualForm.price,
-        }),
-      });
+      try {
+        const response = await fetch("/api/prices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...manualForm,
+            price: manualForm.price,
+          }),
+        });
 
-      const payload = (await response.json()) as {
-        priceRecord?: PriceRecord;
-        error?: string;
-      };
+        const payload = (await response.json()) as {
+          priceRecord?: PriceRecord;
+          error?: string;
+        };
 
-      if (!response.ok || !payload.priceRecord) {
-        throw new Error(payload.error ?? "Failed to save price record.");
+        if (!response.ok || !payload.priceRecord) {
+          throw new Error(payload.error ?? "Failed to save price record.");
+        }
+
+        const nextPriceRecord = payload.priceRecord;
+        setPriceRecords((currentRecords) =>
+          mergeLatestPriceRecord(currentRecords, nextPriceRecord),
+        );
+
+        const selectedAsset = manualAssets.find((asset) => asset.id === manualForm.assetId);
+
+        setManualForm({
+          assetId: selectedAsset?.id ?? manualAssets[0]?.id ?? "",
+          currency: selectedAsset?.currency ?? manualAssets[0]?.currency ?? "",
+          price: "",
+          isValid: true,
+        });
+      } catch (saveError) {
+        setError(
+          saveError instanceof Error ? saveError.message : "Failed to save price record.",
+        );
+      } finally {
+        setIsSavingManualPrice(false);
       }
-
-      const nextPriceRecord = payload.priceRecord;
-      setPriceRecords((currentRecords) =>
-        mergeLatestPriceRecord(currentRecords, nextPriceRecord),
-      );
-
-      const selectedAsset = manualAssets.find((asset) => asset.id === manualForm.assetId);
-
-      setManualForm({
-        assetId: selectedAsset?.id ?? manualAssets[0]?.id ?? "",
-        currency: selectedAsset?.currency ?? manualAssets[0]?.currency ?? "",
-        price: "",
-        isValid: true,
-      });
-    } catch (saveError) {
-      setError(
-        saveError instanceof Error ? saveError.message : "Failed to save price record.",
-      );
-    } finally {
-      setIsSavingManualPrice(false);
-    }
+    });
   }
 
   async function handleRefresh() {
-    setIsRefreshing(true);
-    setError(null);
-    setRefreshResult(null);
+    await runWorkspaceMutation(async () => {
+      setIsRefreshing(true);
+      setError(null);
+      setRefreshResult(null);
 
-    try {
-      const response = await fetch("/api/prices/refresh", { method: "POST" });
-      const payload = (await response.json()) as PriceRefreshResult & { error?: string };
+      try {
+        const response = await fetch("/api/prices/refresh", { method: "POST" });
+        const payload = (await response.json()) as PriceRefreshResult & { error?: string };
 
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Failed to refresh prices.");
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to refresh prices.");
+        }
+
+        setRefreshResult(payload);
+        if (payload.refreshed.length > 0) {
+          await loadData();
+        }
+      } catch (refreshError) {
+        setError(
+          refreshError instanceof Error ? refreshError.message : "Failed to refresh prices.",
+        );
+      } finally {
+        setIsRefreshing(false);
       }
-
-      setRefreshResult(payload);
-      if (payload.refreshed.length > 0) {
-        await loadData();
-      }
-    } catch (refreshError) {
-      setError(refreshError instanceof Error ? refreshError.message : "Failed to refresh prices.");
-    } finally {
-      setIsRefreshing(false);
-    }
+    });
   }
 
   const manualAssets = assets.filter(

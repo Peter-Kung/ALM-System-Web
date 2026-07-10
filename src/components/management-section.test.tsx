@@ -10,10 +10,15 @@ import {
   getAssetSymbolGuidance,
   getAccountActionLabel,
 } from "@/components/management-section";
+import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { AssetPriceSourceType } from "@prisma/client";
 
 test("accounts management section renders the split editor and card-list template", () => {
-  const markup = renderToStaticMarkup(<ManagementSection section="accounts" />);
+  const markup = renderToStaticMarkup(
+    <WorkspaceMutationBoundary>
+      <ManagementSection section="accounts" />
+    </WorkspaceMutationBoundary>,
+  );
 
   assert.match(markup, /Account management/);
   assert.match(markup, /Account editor/);
