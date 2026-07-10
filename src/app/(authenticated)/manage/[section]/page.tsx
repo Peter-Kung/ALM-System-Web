@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import React from "react";
 
 import { ManagementSection } from "@/components/management-section";
 import { managementSections } from "@/lib/navigation";
