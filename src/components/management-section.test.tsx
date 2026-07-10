@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import {
   AccountRecordCard,
+  AssetRecordCard,
   AssetSymbolGuidance,
   ManagementSection,
   formatCurrencyAmount,
@@ -12,7 +13,7 @@ import {
   getAccountActionLabel,
 } from "@/components/management-section";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
-import { AccountType, AssetPriceSourceType } from "@prisma/client";
+import { AccountType, AssetPriceSourceType, AssetType } from "@prisma/client";
 
 test("accounts management section renders the split editor and card-list template", () => {
   const markup = renderToStaticMarkup(
@@ -115,4 +116,25 @@ test("account cards expose archive actions and inactive-state rendering", () => 
   assert.match(inactiveMarkup, /Inactive/);
   assert.match(inactiveMarkup, /Mark active/);
   assert.doesNotMatch(inactiveMarkup, /Archived/);
+});
+
+test("asset card edit action uses asset-specific black text class", () => {
+  const markup = renderToStaticMarkup(
+    <AssetRecordCard
+      asset={{
+        id: "asset-1",
+        name: "Brokerage Fund",
+        assetType: AssetType.FUND,
+        symbol: "BFINX",
+        currency: "USD",
+        priceSourceType: AssetPriceSourceType.AUTO,
+        isActive: true,
+        notes: null,
+      }}
+      onEdit={() => undefined}
+    />,
+  );
+
+  assert.match(markup, /Brokerage Fund/);
+  assert.match(markup, /class="ghost-button compact-button asset-card-edit-button"/);
 });

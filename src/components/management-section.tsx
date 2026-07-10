@@ -24,7 +24,7 @@ export type AccountRecord = {
   notes: string | null;
 };
 
-type AssetRecord = {
+export type AssetRecord = {
   id: string;
   name: string;
   assetType: AssetType;
@@ -354,6 +354,50 @@ export function AccountRecordCard({
           {isUpdating ? "Updating..." : account.isActive ? "Archive" : "Mark active"}
         </button>
       </div>
+    </article>
+  );
+}
+
+export function AssetRecordCard({
+  asset,
+  onEdit,
+}: {
+  asset: AssetRecord;
+  onEdit: (asset: AssetRecord) => void;
+}) {
+  return (
+    <article className="resource-card stack">
+      <div className="section-heading">
+        <div>
+          <h3>{asset.name}</h3>
+          <p className="muted">
+            {formatEnumLabel(asset.assetType)}
+            {asset.symbol ? ` · ${asset.symbol}` : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="ghost-button compact-button asset-card-edit-button"
+          onClick={() => onEdit(asset)}
+        >
+          Edit
+        </button>
+      </div>
+      <dl className="detail-grid">
+        <div>
+          <dt>Currency</dt>
+          <dd>{asset.currency}</dd>
+        </div>
+        <div>
+          <dt>Pricing</dt>
+          <dd>{formatEnumLabel(asset.priceSourceType)}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>{asset.isActive ? "Active" : "Inactive"}</dd>
+        </div>
+      </dl>
+      {asset.notes ? <p className="muted">{asset.notes}</p> : null}
     </article>
   );
 }
@@ -842,39 +886,7 @@ function AssetsManager() {
             <div className="placeholder">No assets yet. Create the first asset.</div>
           ) : null}
           {assets.map((asset) => (
-            <article key={asset.id} className="resource-card stack">
-              <div className="section-heading">
-                <div>
-                  <h3>{asset.name}</h3>
-                  <p className="muted">
-                    {formatEnumLabel(asset.assetType)}
-                    {asset.symbol ? ` · ${asset.symbol}` : ""}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="ghost-button compact-button"
-                  onClick={() => beginEdit(asset)}
-                >
-                  Edit
-                </button>
-              </div>
-              <dl className="detail-grid">
-                <div>
-                  <dt>Currency</dt>
-                  <dd>{asset.currency}</dd>
-                </div>
-                <div>
-                  <dt>Pricing</dt>
-                  <dd>{formatEnumLabel(asset.priceSourceType)}</dd>
-                </div>
-                <div>
-                  <dt>Status</dt>
-                  <dd>{asset.isActive ? "Active" : "Inactive"}</dd>
-                </div>
-              </dl>
-              {asset.notes ? <p className="muted">{asset.notes}</p> : null}
-            </article>
+            <AssetRecordCard key={asset.id} asset={asset} onEdit={beginEdit} />
           ))}
         </div>
       </div>
