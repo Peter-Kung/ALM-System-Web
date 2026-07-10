@@ -9,6 +9,10 @@ export type WorkspaceSummary = {
   latestSnapshotLabel: string;
   netWorthLabel: string;
   snapshotStatusLabel: string;
+  metricRows: Array<{
+    label: string;
+    value: string;
+  }>;
   reminderLabel: string;
 };
 
@@ -48,6 +52,14 @@ export function AppShellFrame({
             <span className="summary-chip">{summary.snapshotStatusLabel}</span>
           </div>
           <p className="summary-meta">{summary.latestSnapshotLabel}</p>
+          <dl className="summary-metrics">
+            {summary.metricRows.map((metric) => (
+              <div key={metric.label} className="summary-metric-row">
+                <dt>{metric.label}</dt>
+                <dd>{metric.value}</dd>
+              </div>
+            ))}
+          </dl>
           <p className="muted">{summary.reminderLabel}</p>
         </section>
 

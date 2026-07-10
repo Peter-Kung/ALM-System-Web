@@ -35,6 +35,11 @@ function buildWorkspaceSummary(summary: DashboardSidebarSummary) {
       latestSnapshotLabel: "No snapshot saved yet",
       netWorthLabel: "Awaiting baseline",
       snapshotStatusLabel: "Not started",
+      metricRows: [
+        { label: "Cash", value: "No data" },
+        { label: "Investments", value: "No data" },
+        { label: "Debt", value: "No data" },
+      ],
       reminderLabel: summary.reminderLabel,
     };
   }
@@ -43,6 +48,20 @@ function buildWorkspaceSummary(summary: DashboardSidebarSummary) {
     latestSnapshotLabel: `Latest snapshot ${formatSnapshotDateTime(summary.snapshotAt)}`,
     netWorthLabel: `${summary.netWorth} ${summary.baseCurrency}`,
     snapshotStatusLabel: summary.status === "COMPLETE" ? "Complete" : "Incomplete",
+    metricRows: [
+      {
+        label: "Cash",
+        value: formatMetricValue(summary.cashPosition, summary.baseCurrency),
+      },
+      {
+        label: "Investments",
+        value: formatMetricValue(summary.investmentValue, summary.baseCurrency),
+      },
+      {
+        label: "Debt",
+        value: formatMetricValue(summary.totalLiabilities, summary.baseCurrency),
+      },
+    ],
     reminderLabel: summary.reminderLabel,
   };
 }
@@ -53,4 +72,12 @@ function formatSnapshotDateTime(value: string) {
     timeStyle: "short",
     timeZone: "UTC",
   });
+}
+
+function formatMetricValue(value: string | null, currency: string) {
+  if (!value) {
+    return `0.00 ${currency}`;
+  }
+
+  return `${value} ${currency}`;
 }

@@ -270,6 +270,40 @@ button:disabled {
   color: var(--sidebar-muted);
 }
 
+.summary-metrics {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+}
+
+.summary-metric-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  align-items: baseline;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(246, 241, 231, 0.08);
+}
+
+.summary-metric-row dt,
+.summary-metric-row dd {
+  margin: 0;
+}
+
+.summary-metric-row dt {
+  color: var(--sidebar-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.summary-metric-row dd {
+  color: var(--sidebar-ink);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
 .sidebar-nav,
 .sidebar-footer {
   gap: 1.25rem;

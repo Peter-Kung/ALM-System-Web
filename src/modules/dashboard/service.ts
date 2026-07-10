@@ -23,6 +23,9 @@ export type DashboardSidebarSummary = {
   netWorth: string | null;
   baseCurrency: string | null;
   status: Snapshot["status"] | null;
+  cashPosition: string | null;
+  investmentValue: string | null;
+  totalLiabilities: string | null;
   accountCount: number;
   holdingCount: number;
   reminderLabel: string;
@@ -183,6 +186,9 @@ function buildSidebarSummary(
       netWorth: null,
       baseCurrency: null,
       status: null,
+      cashPosition: null,
+      investmentValue: null,
+      totalLiabilities: null,
       accountCount: 0,
       holdingCount: 0,
       reminderLabel: "Run the first valuation preview to populate the workspace pulse.",
@@ -195,6 +201,9 @@ function buildSidebarSummary(
     netWorth: latestSnapshot.netWorth,
     baseCurrency: latestSnapshot.baseCurrency,
     status: latestSnapshot.status,
+    cashPosition: latestSnapshot.cashPosition,
+    investmentValue: latestSnapshot.investmentValue,
+    totalLiabilities: latestSnapshot.totalLiabilities,
     accountCount: latestSnapshot.accountCount,
     holdingCount: latestSnapshot.holdingCount,
     reminderLabel:
