@@ -19,6 +19,16 @@ The dashboard can show amount values in compact `K` notation or full numeric
 notation. Compact display is the default Dashboard presentation preference.
 This preference does not change saved snapshot values.
 
+Valuation previews use `TWD` as the fixed base currency. When current inputs
+require a supported foreign exchange rate, the valuation form can prefill the
+rate from a live source before the preview runs. The initial supported live
+pair is `USD` to `TWD`.
+
+Prefilled FX rates are still operator-supplied preview inputs. The signed-in
+owner can edit a prefetched rate or enter a rate manually before running the
+preview. Snapshot confirmation saves the rates visible in the confirmed preview;
+it does not automatically save an unconfirmed prefilled rate.
+
 Master data remains editable. Snapshot history is immutable. Changing an
 account name, asset name, or liability detail later does not rewrite the stored
 meaning of an older snapshot.
