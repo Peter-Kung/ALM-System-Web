@@ -785,97 +785,99 @@ function AssetsManager() {
         </p>
       </div>
       <div className="management-grid">
-        <form className="card stack" onSubmit={handleSubmit}>
-          <div className="section-heading">
-            <h2>{editingId ? "Edit asset" : "Add asset"}</h2>
-            {editingId ? (
-              <button type="button" className="ghost-button compact-button" onClick={reset}>
-                Cancel
-              </button>
-            ) : null}
-          </div>
-          <label className="field">
-            <span>Name</span>
-            <input
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-              required
-            />
-          </label>
-          <div className="field-row">
+        <div className="management-form-column">
+          <form className="card stack" onSubmit={handleSubmit}>
+            <div className="section-heading">
+              <h2>{editingId ? "Edit asset" : "Add asset"}</h2>
+              {editingId ? (
+                <button type="button" className="ghost-button compact-button" onClick={reset}>
+                  Cancel
+                </button>
+              ) : null}
+            </div>
             <label className="field">
-              <span>Asset type</span>
-              <select
-                value={form.assetType}
-                onChange={(event) =>
-                  setForm({ ...form, assetType: event.target.value as AssetType })
-                }
-              >
-                {Object.values(AssetType).map((assetType) => (
-                  <option key={assetType} value={assetType}>
-                    {formatEnumLabel(assetType)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Currency</span>
+              <span>Name</span>
               <input
-                value={form.currency}
-                onChange={(event) => setForm({ ...form, currency: event.target.value })}
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
                 required
               />
             </label>
-          </div>
-          <div className="field-row">
+            <div className="field-row">
+              <label className="field">
+                <span>Asset type</span>
+                <select
+                  value={form.assetType}
+                  onChange={(event) =>
+                    setForm({ ...form, assetType: event.target.value as AssetType })
+                  }
+                >
+                  {Object.values(AssetType).map((assetType) => (
+                    <option key={assetType} value={assetType}>
+                      {formatEnumLabel(assetType)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                <span>Currency</span>
+                <input
+                  value={form.currency}
+                  onChange={(event) => setForm({ ...form, currency: event.target.value })}
+                  required
+                />
+              </label>
+            </div>
+            <div className="field-row">
+              <label className="field">
+                <span>Symbol</span>
+                <input
+                  value={form.symbol}
+                  onChange={(event) => setForm({ ...form, symbol: event.target.value })}
+                />
+                <AssetSymbolGuidance priceSourceType={form.priceSourceType} />
+              </label>
+              <label className="field">
+                <span>Price source</span>
+                <select
+                  value={form.priceSourceType}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      priceSourceType: event.target.value as AssetPriceSourceType,
+                    })
+                  }
+                >
+                  {Object.values(AssetPriceSourceType).map((priceSourceType) => (
+                    <option key={priceSourceType} value={priceSourceType}>
+                      {formatEnumLabel(priceSourceType)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <label className="field">
-              <span>Symbol</span>
-              <input
-                value={form.symbol}
-                onChange={(event) => setForm({ ...form, symbol: event.target.value })}
+              <span>Notes</span>
+              <textarea
+                value={form.notes}
+                onChange={(event) => setForm({ ...form, notes: event.target.value })}
+                rows={4}
               />
-              <AssetSymbolGuidance priceSourceType={form.priceSourceType} />
             </label>
-            <label className="field">
-              <span>Price source</span>
-              <select
-                value={form.priceSourceType}
-                onChange={(event) =>
-                  setForm({
-                    ...form,
-                    priceSourceType: event.target.value as AssetPriceSourceType,
-                  })
-                }
-              >
-                {Object.values(AssetPriceSourceType).map((priceSourceType) => (
-                  <option key={priceSourceType} value={priceSourceType}>
-                    {formatEnumLabel(priceSourceType)}
-                  </option>
-                ))}
-              </select>
+            <label className="toggle-field">
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+              />
+              <span>Active asset</span>
             </label>
-          </div>
-          <label className="field">
-            <span>Notes</span>
-            <textarea
-              value={form.notes}
-              onChange={(event) => setForm({ ...form, notes: event.target.value })}
-              rows={4}
-            />
-          </label>
-          <label className="toggle-field">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
-            />
-            <span>Active asset</span>
-          </label>
-          {error ? <p className="error">{error}</p> : null}
-          <button type="submit" disabled={isSaving}>
-            {isSaving ? "Saving..." : editingId ? "Save asset" : "Create asset"}
-          </button>
-        </form>
+            {error ? <p className="error">{error}</p> : null}
+            <button type="submit" disabled={isSaving}>
+              {isSaving ? "Saving..." : editingId ? "Save asset" : "Create asset"}
+            </button>
+          </form>
+        </div>
         <div className="stack">
           <div className="section-heading">
             <h2>Existing assets</h2>

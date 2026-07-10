@@ -47,6 +47,20 @@ test("accounts management section can be locked by the shared mutation overlay",
   assert.match(markup, /inert=""/);
 });
 
+test("assets management section keeps the editor in the sticky form column", () => {
+  const markup = renderToStaticMarkup(
+    <WorkspaceMutationBoundary>
+      <ManagementSection section="assets" />
+    </WorkspaceMutationBoundary>,
+  );
+
+  assert.match(markup, /Asset management/);
+  assert.match(markup, /management-grid/);
+  assert.match(markup, /management-form-column/);
+  assert.match(markup, /Add asset/);
+  assert.match(markup, /Existing assets/);
+});
+
 test("asset symbol guidance only appears for auto-priced assets", () => {
   assert.equal(
     getAssetSymbolGuidance(AssetPriceSourceType.AUTO),
