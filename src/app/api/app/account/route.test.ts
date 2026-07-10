@@ -33,6 +33,9 @@ test("patchAccountForUser clears the session after a successful credential updat
     async create() {
       throw new Error("create should not run");
     },
+    async createFirstAdministrator() {
+      throw new Error("createFirstAdministrator should not run");
+    },
     async update(id, data) {
       return {
         id,
@@ -83,6 +86,9 @@ test("patchAccountHandler clears the session after a successful password update"
     },
     async create() {
       throw new Error("create should not run");
+    },
+    async createFirstAdministrator() {
+      throw new Error("createFirstAdministrator should not run");
     },
     async update(id, data) {
       savedPasswordHash =
@@ -154,6 +160,9 @@ test("patchAccountForUser does not clear the session when credential validation 
     },
     async create() {
       throw new Error("create should not run");
+    },
+    async createFirstAdministrator() {
+      throw new Error("createFirstAdministrator should not run");
     },
     async update() {
       throw new Error("update should not run");

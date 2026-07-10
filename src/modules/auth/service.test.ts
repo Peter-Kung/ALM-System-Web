@@ -4,7 +4,9 @@ import test from "node:test";
 import type { AuthRepository, AuthUser } from "@/modules/auth/repository";
 import { RepositoryValidationError } from "@/lib/repository-utils";
 import {
+  createFirstAdministrator,
   hashPassword,
+  isBootstrapRequired,
   updateAccountCredentials,
   validateOwnerLogin,
   verifyPassword,
@@ -36,6 +38,16 @@ function createRepositoryFixture(initialUsers: AuthUser[] = []): AuthRepository 
       users.push(user);
       return user;
     },
+    async createFirstAdministrator(data) {
+      const user = {
+        id: `user-${users.length + 1}`,
+        username: data.username,
+        passwordHash: data.passwordHash,
+        createdAt: new Date(`2026-07-0${users.length + 1}T00:00:00Z`),
+      };
+      users.push(user);
+      return user;
+    },
     async update(id, data) {
       const user = users.find((entry) => entry.id === id);
       if (!user) {
@@ -55,34 +67,39 @@ function createRepositoryFixture(initialUsers: AuthUser[] = []): AuthRepository 
   };
 }
 
-test("validateOwnerLogin creates the owner with a password hash in a fresh environment", async () => {
+test("isBootstrapRequired is true only while the database has no users", async () => {
   const repository = createRepositoryFixture();
 
-  const user = await validateOwnerLogin("owner", "change-me", repository);
+  assert.equal(await isBootstrapRequired(repository), true);
 
-  assert.ok(user);
-  assert.equal(user.username, "owner");
-  assert.ok(user.passwordHash);
-  assert.equal(await verifyPassword("change-me", user.passwordHash), true);
+  await createFirstAdministrator(
+    {
+      username: "owner",
+      password: "new-password",
+      confirmPassword: "new-password",
+    },
+    repository,
+  );
+
+  assert.equal(await isBootstrapRequired(repository), false);
 });
 
-test("validateOwnerLogin backfills the legacy owner account when the user has no password hash", async () => {
-  const repository = createRepositoryFixture([
+test("createFirstAdministrator creates the only first-run admin account", async () => {
+  const repository = createRepositoryFixture();
+
+  const user = await createFirstAdministrator(
     {
-      id: "user-1",
-      username: "legacy-owner",
-      passwordHash: null,
-      createdAt: new Date("2026-07-01T00:00:00Z"),
+      username: " owner ",
+      password: "new-password",
+      confirmPassword: "new-password",
     },
-  ]);
+    repository,
+  );
 
-  const user = await validateOwnerLogin("owner", "change-me", repository);
-
-  assert.ok(user);
-  assert.equal(user.id, "user-1");
   assert.equal(user.username, "owner");
   assert.ok(user.passwordHash);
-  assert.equal(await verifyPassword("change-me", user.passwordHash), true);
+  assert.equal(await verifyPassword("new-password", user.passwordHash), true);
+  assert.equal(await validateOwnerLogin("owner", "new-password", repository), user);
 });
 
 test("validateOwnerLogin accepts the stored password hash once database-backed auth is active", async () => {
@@ -101,56 +118,57 @@ test("validateOwnerLogin accepts the stored password hash once database-backed a
   assert.equal(user.id, "user-1");
 });
 
-test("validateOwnerLogin rejects legacy environment credentials after a password hash already exists", async () => {
+test("validateOwnerLogin rejects fixed credentials in an empty database", async () => {
+  const emptyRepository = createRepositoryFixture();
+
+  assert.equal(
+    await validateOwnerLogin("owner", "change-me", emptyRepository),
+    null,
+  );
+
+});
+
+test("validateOwnerLogin backfills an existing legacy owner with no password hash", async () => {
   const repository = createRepositoryFixture([
     {
       id: "user-1",
-      username: "renamed-owner",
-      passwordHash: await hashPassword("new-password"),
+      username: "owner",
+      passwordHash: null,
       createdAt: new Date("2026-07-01T00:00:00Z"),
     },
   ]);
 
   const user = await validateOwnerLogin("owner", "change-me", repository);
 
-  assert.equal(user, null);
+  assert.ok(user);
+  assert.ok(user.passwordHash);
+  assert.equal(await verifyPassword("change-me", user.passwordHash), true);
 });
 
-test("validateOwnerLogin recovers when a concurrent bootstrap creates the owner first", async () => {
-  const passwordHash = await hashPassword("change-me");
-  const users: AuthUser[] = [];
-  const repository: AuthRepository = {
-    async findById(id) {
-      return users.find((user) => user.id === id) ?? null;
+test("createFirstAdministrator rejects setup after any user exists", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("new-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
     },
-    async findByUsername(username) {
-      return users.find((user) => user.username === username) ?? null;
-    },
-    async findFirstUser() {
-      return users[0] ?? null;
-    },
-    async findFirstUserWithPasswordHash() {
-      return users.find((user) => user.passwordHash) ?? null;
-    },
-    async create() {
-      users.push({
-        id: "user-1",
-        username: "owner",
-        passwordHash,
-        createdAt: new Date("2026-07-01T00:00:00Z"),
-      });
+  ]);
 
-      throw new Error("simulated concurrent create");
-    },
-    async update() {
-      throw new Error("update should not run");
-    },
-  };
-
-  const user = await validateOwnerLogin("owner", "change-me", repository);
-
-  assert.ok(user);
-  assert.equal(user.id, "user-1");
+  await assert.rejects(
+    () =>
+      createFirstAdministrator(
+        {
+          username: "owner.next",
+          password: "other-password",
+          confirmPassword: "other-password",
+        },
+        repository,
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message === "Setup is already complete.",
+  );
 });
 
 test("updateAccountCredentials updates the username and password after validating the current password", async () => {
@@ -231,7 +249,7 @@ test("updateAccountCredentials makes username-only changes require the new usern
   assert.equal(await validateOwnerLogin("owner", "current-password", repository), null);
 });
 
-test("updateAccountCredentials backfills the legacy password hash before saving changes", async () => {
+test("updateAccountCredentials backfills a legacy owner before saving changes", async () => {
   const repository = createRepositoryFixture([
     {
       id: "user-1",

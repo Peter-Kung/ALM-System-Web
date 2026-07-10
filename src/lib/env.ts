@@ -18,6 +18,7 @@ export const env = {
   appName: process.env.APP_NAME ?? "ALM System",
   fixedUsername: process.env.APP_USERNAME ?? "owner",
   fixedPassword: getOptionalSecret("APP_PASSWORD", "change-me"),
+  setupToken: getOptionalSecret("APP_SETUP_TOKEN", "setup-token"),
   sessionSecret: getOptionalSecret(
     "SESSION_SECRET",
     "development-session-secret-change-me",
@@ -35,6 +36,10 @@ function requireConfiguredValue(value: string | null, envName: string) {
 
 export function requireFixedPassword() {
   return requireConfiguredValue(env.fixedPassword, "APP_PASSWORD");
+}
+
+export function requireSetupToken() {
+  return requireConfiguredValue(env.setupToken, "APP_SETUP_TOKEN");
 }
 
 export function requireSessionSecret() {

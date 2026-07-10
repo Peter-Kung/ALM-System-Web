@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { getSessionFromCookies } from "@/lib/auth/session";
+import { requireApiSession } from "@/lib/auth/api";
 
 export async function GET() {
-  const session = await getSessionFromCookies();
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { response, session } = await requireApiSession();
+  if (response || !session) {
+    return response;
   }
 
   return NextResponse.json({ session });

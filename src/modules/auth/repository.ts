@@ -67,6 +67,25 @@ export function createAuthRepository(db: PrismaExecutor = prisma) {
         },
       });
     },
+    async createFirstAdministrator(data: {
+      passwordHash: string;
+      username: string;
+    }): Promise<AuthUser> {
+      return db.user.create({
+        data: {
+          username: data.username,
+          passwordHash: data.passwordHash,
+          role: "ADMIN",
+          bootstrapKey: "single-user",
+        },
+        select: {
+          id: true,
+          username: true,
+          passwordHash: true,
+          createdAt: true,
+        },
+      });
+    },
     update(id: string, data: Prisma.UserUncheckedUpdateInput): Promise<AuthUser> {
       return db.user.update({
         where: { id },

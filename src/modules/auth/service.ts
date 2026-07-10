@@ -20,6 +20,12 @@ export type UpdateAccountCredentialsInput = {
   username?: string;
 };
 
+export type CreateFirstAdministratorInput = {
+  confirmPassword: string;
+  password: string;
+  username: string;
+};
+
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
 }
@@ -30,44 +36,14 @@ export async function verifyPassword(password: string, passwordHash: string) {
 
 async function backfillLegacyOwner(
   repository: AuthRepository,
-  user: AuthUser | null,
+  user: AuthUser,
   password: string,
 ) {
   const passwordHash = await hashPassword(password);
-
-  if (user) {
-    return repository.update(user.id, {
-      username: env.fixedUsername,
-      passwordHash,
-    });
-  }
-
-  const firstUser = await repository.findFirstUser();
-  if (firstUser) {
-    return repository.update(firstUser.id, {
-      username: env.fixedUsername,
-      passwordHash,
-    });
-  }
-
-  return repository.create({
+  return repository.update(user.id, {
     username: env.fixedUsername,
     passwordHash,
   });
-}
-
-async function recoverFromBootstrapRace(
-  repository: AuthRepository,
-  password: string,
-  error: unknown,
-) {
-  const user = await repository.findByUsername(env.fixedUsername);
-
-  if (user?.passwordHash && (await verifyPassword(password, user.passwordHash))) {
-    return user;
-  }
-
-  throw error;
 }
 
 export async function validateOwnerLogin(
@@ -78,28 +54,23 @@ export async function validateOwnerLogin(
   const trimmedUsername = username.trim();
   const user = await repository.findByUsername(trimmedUsername);
 
-  if (user?.passwordHash) {
-    const isValid = await verifyPassword(password, user.passwordHash);
-    return isValid ? user : null;
+  if (user && !user.passwordHash) {
+    const hashedUser = await repository.findFirstUserWithPasswordHash();
+    if (
+      !hashedUser &&
+      trimmedUsername === env.fixedUsername &&
+      password === requireFixedPassword()
+    ) {
+      return backfillLegacyOwner(repository, user, password);
+    }
   }
 
-  const hashedUser = await repository.findFirstUserWithPasswordHash();
-  if (hashedUser) {
+  if (!user?.passwordHash) {
     return null;
   }
 
-  if (
-    trimmedUsername !== env.fixedUsername ||
-    password !== requireFixedPassword()
-  ) {
-    return null;
-  }
-
-  try {
-    return await backfillLegacyOwner(repository, user, password);
-  } catch (error) {
-    return recoverFromBootstrapRace(repository, password, error);
-  }
+  const isValid = await verifyPassword(password, user.passwordHash);
+  return isValid ? user : null;
 }
 
 function normalizeUsername(username: string) {
@@ -137,6 +108,42 @@ function validateNextPassword(
   }
 }
 
+export async function isBootstrapRequired(
+  repository: AuthRepository = createAuthRepository(),
+) {
+  return (await repository.findFirstUser()) === null;
+}
+
+export async function createFirstAdministrator(
+  input: CreateFirstAdministratorInput,
+  repository: AuthRepository = createAuthRepository(),
+) {
+  const existingUser = await repository.findFirstUser();
+  if (existingUser) {
+    throw new RepositoryValidationError("Setup is already complete.");
+  }
+
+  const username = normalizeUsername(input.username);
+  validateNextUsername(username);
+  validateNextPassword(input.password, input.confirmPassword);
+
+  try {
+    return await repository.createFirstAdministrator({
+      username,
+      passwordHash: await hashPassword(input.password),
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new RepositoryValidationError("Setup is already complete.");
+    }
+
+    throw error;
+  }
+}
+
 async function requireCurrentUser(
   repository: AuthRepository,
   userId: string,
@@ -165,17 +172,16 @@ async function verifyCurrentPassword(
   }
 
   if (
-    user.username !== env.fixedUsername ||
-    currentPassword !== requireFixedPassword()
+    user.username === env.fixedUsername &&
+    currentPassword === requireFixedPassword()
   ) {
-    throw new RepositoryValidationError("Current password is incorrect.");
+    const hashedUser = await repository.findFirstUserWithPasswordHash();
+    if (!hashedUser) {
+      return backfillLegacyOwner(repository, user, currentPassword);
+    }
   }
 
-  try {
-    return await backfillLegacyOwner(repository, user, currentPassword);
-  } catch (error) {
-    return recoverFromBootstrapRace(repository, currentPassword, error);
-  }
+  throw new RepositoryValidationError("Current password is incorrect.");
 }
 
 export async function updateAccountCredentials(

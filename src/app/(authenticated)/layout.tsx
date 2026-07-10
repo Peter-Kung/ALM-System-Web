@@ -4,6 +4,8 @@ import { ReactNode } from "react";
 import { AppShell } from "@/components/app-shell";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { getSessionFromCookies } from "@/lib/auth/session";
+import { isBootstrapRequired } from "@/modules/auth";
+import { createAuthRepository } from "@/modules/auth/repository";
 import { createDashboardSummaryForUser } from "@/modules/dashboard";
 import type { DashboardSidebarSummary } from "@/modules/dashboard/service";
 
@@ -13,15 +15,24 @@ export default async function AuthenticatedLayout({
   children: ReactNode;
 }) {
   const session = await getSessionFromCookies();
+  const repository = createAuthRepository();
+  if (await isBootstrapRequired(repository)) {
+    redirect("/setup");
+  }
 
   if (!session) {
     redirect("/login");
   }
 
-  const dashboard = await createDashboardSummaryForUser(session.sub);
+  const user = await repository.findById(session.sub);
+  if (!user) {
+    redirect("/login");
+  }
+
+  const dashboard = await createDashboardSummaryForUser(user.id);
   return (
     <AppShell
-      username={session.username}
+      username={user.username}
       summary={buildWorkspaceSummary(dashboard.sidebarSummary)}
     >
       <WorkspaceMutationBoundary>{children}</WorkspaceMutationBoundary>

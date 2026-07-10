@@ -73,6 +73,8 @@ model User {
   id          String      @id @default(cuid())
   username    String      @unique
   passwordHash String?
+  role        String      @default("ADMIN")
+  bootstrapKey String?     @unique
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   accounts    Account[]

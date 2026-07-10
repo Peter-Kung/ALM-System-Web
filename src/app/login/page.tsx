@@ -5,6 +5,7 @@ import { LoginForm } from "@/components/login-form";
 import { LoginPageFrame } from "@/components/login-page-frame";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { getSessionFromCookies } from "@/lib/auth/session";
+import { isBootstrapRequired } from "@/modules/auth";
 
 export default async function LoginPage({
   searchParams,
@@ -12,6 +13,11 @@ export default async function LoginPage({
   searchParams?: Promise<{ next?: string }>;
 }) {
   const session = await getSessionFromCookies();
+  const bootstrapRequired = await isBootstrapRequired();
+  if (bootstrapRequired) {
+    redirect("/setup");
+  }
+
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const nextPath =
     resolvedSearchParams?.next &&
