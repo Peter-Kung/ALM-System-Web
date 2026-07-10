@@ -634,6 +634,13 @@ button:disabled {
     var(--panel);
 }
 
+.dashboard-reminders {
+  border-color: rgba(125, 143, 90, 0.22);
+  background:
+    linear-gradient(135deg, rgba(125, 143, 90, 0.1), rgba(255, 255, 255, 0)),
+    var(--panel);
+}
+
 .dashboard-allocation-card {
   overflow: hidden;
 }

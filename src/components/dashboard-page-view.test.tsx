@@ -162,6 +162,7 @@ test("dashboard page view renders summary-first sections and limits reminders to
   assert.match(markup, /75.00%/);
   assert.match(markup, /25.00%/);
   assert.match(markup, /Reminders/);
+  assert.match(markup, /Next up/);
   assert.match(markup, /Coverage/);
   assert.match(markup, /Trend/);
   assert.match(markup, /Net worth/);
@@ -174,8 +175,13 @@ test("dashboard page view renders summary-first sections and limits reminders to
   assert.match(markup, /Missing valid price record for Global Fund\./);
   assert.match(markup, /FX rate for USD is stale\./);
   assert.match(markup, /Cash account balance needs refresh\./);
+  assert.match(markup, /1 more reminder recorded in the latest snapshot\./);
   assert.doesNotMatch(markup, /Older reminder should be hidden\./);
   assert.doesNotMatch(markup, /Debt balances/);
+  assert.ok(
+    markup.indexOf("<h2>Reminders</h2>") < markup.indexOf("<h2>Allocation</h2>"),
+    "Reminders should render before lower-priority allocation and trend sections.",
+  );
 });
 
 test("dashboard page view renders a stable allocation fallback when no allocation data exists", () => {

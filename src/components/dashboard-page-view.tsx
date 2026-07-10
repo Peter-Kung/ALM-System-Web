@@ -119,6 +119,38 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
         </article>
       </div>
 
+      <article className="resource-card stack dashboard-reminders">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Next up</p>
+            <h2>Reminders</h2>
+            <p className="muted">
+              {reminders.issueCount === 0
+                ? "No active reminders in the latest snapshot."
+                : `${reminders.issueCount} stored issues in the latest snapshot.`}
+            </p>
+          </div>
+          <DashboardLink href="/manage/snapshots">Review history</DashboardLink>
+        </div>
+        {reminders.visibleMessages.length === 0 ? (
+          <p className="muted">The latest snapshot completed without missing-input warnings.</p>
+        ) : (
+          <div className="stack">
+            {reminders.visibleMessages.map((message) => (
+              <div key={message} className="issue-note">
+                {message}
+              </div>
+            ))}
+            {reminders.remainingCount > 0 ? (
+              <p className="muted">
+                {reminders.remainingCount} more reminder
+                {reminders.remainingCount === 1 ? "" : "s"} recorded in the latest snapshot.
+              </p>
+            ) : null}
+          </div>
+        )}
+      </article>
+
       <DashboardAllocationCard
         allocation={dashboard.allocation}
         baseCurrency={snapshot.baseCurrency}
@@ -130,31 +162,6 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
       />
 
       <div className="dashboard-grid dashboard-grid-secondary">
-        <article className="resource-card stack">
-          <div className="section-heading">
-            <div>
-              <h2>Reminders</h2>
-              <p className="muted">
-                {reminders.issueCount === 0
-                  ? "No active reminders in the latest snapshot."
-                  : `${reminders.issueCount} stored issues in the latest snapshot.`}
-              </p>
-            </div>
-            <DashboardLink href="/manage/snapshots">Review history</DashboardLink>
-          </div>
-          {reminders.visibleMessages.length === 0 ? (
-            <p className="muted">The latest snapshot completed without missing-input warnings.</p>
-          ) : (
-            <div className="stack">
-              {reminders.visibleMessages.map((message) => (
-                <div key={message} className="issue-note">
-                  {message}
-                </div>
-              ))}
-            </div>
-          )}
-        </article>
-
         <article className="resource-card stack">
           <div className="section-heading">
             <div>

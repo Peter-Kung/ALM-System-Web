@@ -1,0 +1,115 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import { SnapshotStatus } from "@prisma/client";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { createDashboardPage } from "@/app/(authenticated)/dashboard/page-route";
+import type { DashboardSummary } from "@/modules/dashboard/service";
+
+function createDashboardSummary(): DashboardSummary {
+  return {
+    sidebarSummary: {
+      hasSnapshot: true,
+      snapshotAt: "2026-07-08T00:00:00.000Z",
+      netWorth: "800.00",
+      baseCurrency: "TWD",
+      status: SnapshotStatus.COMPLETE,
+      cashPosition: "300.00",
+      investmentValue: "900.00",
+      totalLiabilities: "400.00",
+      accountCount: 2,
+      holdingCount: 3,
+      reminderLabel: "Missing valid price record for Global Fund.",
+    },
+    emptyState: null,
+    heroSummary: {
+      snapshotAt: "2026-07-08T00:00:00.000Z",
+      status: SnapshotStatus.COMPLETE,
+      issueCount: 2,
+      hasTrend: true,
+      netWorthDirection: "positive",
+    },
+    latestSnapshot: {
+      id: "snapshot-1",
+      status: SnapshotStatus.COMPLETE,
+      baseCurrency: "TWD",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      netWorth: "800.00",
+      cashPosition: "300.00",
+      investmentValue: "900.00",
+      monthlyDebtPaymentTotal: "120.00",
+      snapshotAt: "2026-07-08T00:00:00.000Z",
+      issueCount: 2,
+      accountCount: 2,
+      holdingCount: 3,
+      liabilityCount: 1,
+    },
+    coverage: {
+      accountCount: 2,
+      holdingCount: 3,
+      liabilityCount: 1,
+      snapshotAt: "2026-07-08T00:00:00.000Z",
+    },
+    reminders: {
+      issueCount: 2,
+      visibleMessages: [
+        "Missing valid price record for Global Fund.",
+        "FX rate for USD is stale.",
+      ],
+      remainingCount: 0,
+    },
+    allocation: [
+      { label: "Stock", value: "900.00", shareOfAssets: "75.00" },
+      { label: "Cash", value: "300.00", shareOfAssets: "25.00" },
+    ],
+    liabilityBreakdown: [],
+    trend: {
+      previousSnapshotAt: "2026-07-01T00:00:00.000Z",
+      netWorthChange: "80.00",
+      totalAssetsChange: "100.00",
+      totalLiabilitiesChange: "20.00",
+      monthlyDebtPaymentChange: "5.00",
+    },
+    trendSeries: [
+      {
+        snapshotAt: "2026-07-01T00:00:00.000Z",
+        netWorth: "720.00",
+        totalAssets: "1100.00",
+        totalLiabilities: "380.00",
+      },
+      {
+        snapshotAt: "2026-07-08T00:00:00.000Z",
+        netWorth: "800.00",
+        totalAssets: "1200.00",
+        totalLiabilities: "400.00",
+      },
+    ],
+    issueMessages: [
+      "Missing valid price record for Global Fund.",
+      "FX rate for USD is stale.",
+    ],
+  };
+}
+
+test("dashboard route renders the dedicated reminders area after authenticated summary load", async () => {
+  const requestedUserIds: string[] = [];
+  const DashboardPage = createDashboardPage({
+    getSession: async () => ({ sub: "user-1", username: "owner" }),
+    createDashboardSummary: async (userId) => {
+      requestedUserIds.push(userId);
+      return createDashboardSummary();
+    },
+  });
+
+  const markup = renderToStaticMarkup(await DashboardPage());
+
+  assert.deepEqual(requestedUserIds, ["user-1"]);
+  assert.match(markup, /<h2>Reminders<\/h2>/);
+  assert.match(markup, /Missing valid price record for Global Fund\./);
+  assert.ok(
+    markup.indexOf("<h2>Reminders</h2>") < markup.indexOf("<h2>Allocation</h2>"),
+    "Dashboard route should place reminders before lower-priority allocation content.",
+  );
+});
