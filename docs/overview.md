@@ -15,6 +15,10 @@ The dashboard reports from the latest saved snapshot. It does not recalculate
 live market values on page load. This keeps the homepage stable and aligned
 with the same saved history used for snapshot review.
 
+The dashboard can show amount values in compact `K` notation or full numeric
+notation. Compact display is the default Dashboard presentation preference.
+This preference does not change saved snapshot values.
+
 Master data remains editable. Snapshot history is immutable. Changing an
 account name, asset name, or liability detail later does not rewrite the stored
 meaning of an older snapshot.

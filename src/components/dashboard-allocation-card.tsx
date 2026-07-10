@@ -8,6 +8,10 @@ import {
   Tooltip,
 } from "recharts";
 
+import {
+  type DashboardAmountDisplayMode,
+  formatDashboardAmount,
+} from "@/components/dashboard-amount-format";
 import type { DashboardAllocationItem } from "@/modules/dashboard/service";
 
 const ALLOCATION_COLORS = [
@@ -21,11 +25,13 @@ const ALLOCATION_COLORS = [
 type DashboardAllocationCardProps = {
   allocation: DashboardAllocationItem[];
   baseCurrency: string;
+  amountDisplayMode: DashboardAmountDisplayMode;
 };
 
 export function DashboardAllocationCard({
   allocation,
   baseCurrency,
+  amountDisplayMode,
 }: DashboardAllocationCardProps) {
   if (allocation.length === 0) {
     return (
@@ -77,7 +83,14 @@ export function DashboardAllocationCard({
                 />
               ))}
             </Pie>
-            <Tooltip content={<AllocationTooltip baseCurrency={baseCurrency} />} />
+            <Tooltip
+              content={
+                <AllocationTooltip
+                  baseCurrency={baseCurrency}
+                  amountDisplayMode={amountDisplayMode}
+                />
+              }
+            />
           </PieChart>
         </div>
 
@@ -95,7 +108,9 @@ export function DashboardAllocationCard({
                 <div className="dashboard-allocation-legend-row">
                   <strong>{item.label}</strong>
                   <span>
-                    {baseCurrency} {formatMoneyLabel(Number(item.value))}
+                    {formatDashboardAmount(item.value, baseCurrency, amountDisplayMode, {
+                      currencyPosition: "prefix",
+                    })}
                   </span>
                 </div>
                 <span className="muted">{item.shareOfAssets}% of assets</span>
@@ -108,13 +123,6 @@ export function DashboardAllocationCard({
   );
 }
 
-function formatMoneyLabel(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
 type AllocationTooltipProps = {
   active?: boolean;
   payload?: Array<{
@@ -125,12 +133,14 @@ type AllocationTooltipProps = {
     };
   }>;
   baseCurrency: string;
+  amountDisplayMode: DashboardAmountDisplayMode;
 };
 
 function AllocationTooltip({
   active,
   payload,
   baseCurrency,
+  amountDisplayMode,
 }: AllocationTooltipProps) {
   if (!active || !payload?.[0]) {
     return null;
@@ -145,7 +155,10 @@ function AllocationTooltip({
     <div className="dashboard-allocation-tooltip">
       <strong>{label}</strong>
       <div>
-        {baseCurrency} {formatMoneyLabel(amount)} · {share}%
+        {formatDashboardAmount(amount, baseCurrency, amountDisplayMode, {
+          currencyPosition: "prefix",
+        })}{" "}
+        · {share}%
       </div>
     </div>
   );

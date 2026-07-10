@@ -638,6 +638,54 @@ button:disabled {
   margin: 0;
 }
 
+.dashboard-controls-card {
+  justify-content: space-between;
+}
+
+.dashboard-amount-control {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dashboard-amount-control legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 12rem;
+  padding: 0.22rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.dashboard-segmented-control button {
+  min-height: 2.3rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.dashboard-segmented-control button.is-active {
+  background: var(--accent-strong);
+  color: #fffdf9;
+  box-shadow: 0 8px 18px rgba(43, 56, 42, 0.16);
+}
+
 .dashboard-grid {
   display: grid;
   gap: 1rem;

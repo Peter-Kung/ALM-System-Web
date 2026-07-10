@@ -2,11 +2,71 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { SnapshotStatus } from "@prisma/client";
-import React from "react";
+import { JSDOM } from "jsdom";
+import React, { act } from "react";
+import { createRoot, Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { DASHBOARD_AMOUNT_DISPLAY_STORAGE_KEY } from "@/components/dashboard-amount-format";
 import { DashboardPageView } from "@/components/dashboard-page-view";
+import { getDashboardTrendAxisLayout } from "@/components/dashboard-trend-card";
 import type { DashboardSummary } from "@/modules/dashboard/service";
+
+type DomGlobals = Pick<
+  typeof globalThis,
+  "document" | "Event" | "HTMLElement" | "localStorage" | "self" | "window"
+>;
+
+const reactActGlobal = globalThis as typeof globalThis & {
+  IS_REACT_ACT_ENVIRONMENT?: boolean;
+};
+
+reactActGlobal.IS_REACT_ACT_ENVIRONMENT = true;
+
+function createDashboardDom() {
+  const dom = new JSDOM('<div id="root"></div>', { url: "http://localhost/dashboard" });
+  const previousGlobals: Partial<DomGlobals> = {
+    document: globalThis.document,
+    Event: globalThis.Event,
+    HTMLElement: globalThis.HTMLElement,
+    localStorage: globalThis.localStorage,
+    self: globalThis.self,
+    window: globalThis.window,
+  };
+
+  globalThis.document = dom.window.document;
+  globalThis.Event = dom.window.Event;
+  globalThis.HTMLElement = dom.window.HTMLElement;
+  globalThis.localStorage = dom.window.localStorage;
+  globalThis.self = dom.window as unknown as Window & typeof globalThis;
+  globalThis.window = dom.window as unknown as Window & typeof globalThis;
+
+  const rootElement = dom.window.document.getElementById("root");
+  assert.ok(rootElement);
+
+  const root = createRoot(rootElement);
+
+  return {
+    document: dom.window.document,
+    root,
+    restore() {
+      for (const [key, value] of Object.entries(previousGlobals)) {
+        if (value === undefined) {
+          delete (globalThis as Record<string, unknown>)[key];
+        } else {
+          (globalThis as Record<string, unknown>)[key] = value;
+        }
+      }
+      dom.window.close();
+    },
+  };
+}
+
+async function unmount(root: Root) {
+  await act(async () => {
+    root.unmount();
+  });
+}
 
 function createDashboardSummary(
   overrides: Partial<DashboardSummary> = {},
@@ -182,6 +242,135 @@ test("dashboard page view renders summary-first sections and limits reminders to
     markup.indexOf("<h2>Reminders</h2>") < markup.indexOf("<h2>Allocation</h2>"),
     "Reminders should render before lower-priority allocation and trend sections.",
   );
+});
+
+test("dashboard page view defaults dashboard amounts to compact K display", () => {
+  const markup = renderToStaticMarkup(
+    <DashboardPageView
+      dashboard={createDashboardSummary({
+        latestSnapshot: {
+          id: "snapshot-1",
+          status: SnapshotStatus.COMPLETE,
+          baseCurrency: "TWD",
+          totalAssets: "1200.00",
+          totalLiabilities: "1000.00",
+          netWorth: "999.99",
+          cashPosition: "300.00",
+          investmentValue: "900.00",
+          monthlyDebtPaymentTotal: "120.00",
+          snapshotAt: "2026-07-08T00:00:00.000Z",
+          issueCount: 4,
+          accountCount: 2,
+          holdingCount: 3,
+          liabilityCount: 1,
+        },
+        allocation: [
+          { label: "Stock", value: "1200.00", shareOfAssets: "54.55" },
+          { label: "Cash", value: "999.99", shareOfAssets: "45.45" },
+        ],
+        trendSeries: [
+          {
+            snapshotAt: "2026-07-01T00:00:00.000Z",
+            netWorth: "900.00",
+            totalAssets: "1000.00",
+            totalLiabilities: "100.00",
+          },
+          {
+            snapshotAt: "2026-07-08T00:00:00.000Z",
+            netWorth: "999.99",
+            totalAssets: "1200.00",
+            totalLiabilities: "1000.00",
+          },
+        ],
+      })}
+    />,
+  );
+
+  assert.match(markup, /Amount display/);
+  assert.match(markup, /Compact/);
+  assert.match(markup, /Full/);
+  assert.match(markup, /999\.99 TWD/);
+  assert.match(markup, /1\.2K TWD/);
+  assert.match(markup, /1K TWD/);
+  assert.match(markup, /TWD 1\.2K/);
+  assert.match(markup, /TWD 999\.99/);
+  assert.doesNotMatch(markup, /1200\.00 TWD/);
+  assert.doesNotMatch(markup, /TWD 1200\.00/);
+});
+
+test("dashboard page view persists the full amount display preference", async () => {
+  const { document, root, restore } = createDashboardDom();
+  const dashboard = createDashboardSummary({
+    latestSnapshot: {
+      id: "snapshot-1",
+      status: SnapshotStatus.COMPLETE,
+      baseCurrency: "TWD",
+      totalAssets: "1200.00",
+      totalLiabilities: "1000.00",
+      netWorth: "999.99",
+      cashPosition: "300.00",
+      investmentValue: "900.00",
+      monthlyDebtPaymentTotal: "120.00",
+      snapshotAt: "2026-07-08T00:00:00.000Z",
+      issueCount: 4,
+      accountCount: 2,
+      holdingCount: 3,
+      liabilityCount: 1,
+    },
+  });
+
+  try {
+    await act(async () => {
+      root.render(<DashboardPageView dashboard={dashboard} />);
+      await Promise.resolve();
+    });
+
+    assert.match(document.body.textContent ?? "", /1\.2K TWD/);
+
+    const fullButton = document.querySelector<HTMLButtonElement>(
+      '.dashboard-segmented-control button[aria-pressed="false"]',
+    );
+    assert.ok(fullButton);
+    assert.equal(fullButton.textContent, "Full");
+
+    await act(async () => {
+      fullButton.click();
+      await Promise.resolve();
+    });
+
+    assert.equal(
+      globalThis.localStorage.getItem(DASHBOARD_AMOUNT_DISPLAY_STORAGE_KEY),
+      "full",
+    );
+    assert.match(document.body.textContent ?? "", /1200\.00 TWD/);
+    assert.doesNotMatch(document.body.textContent ?? "", /1\.2K TWD/);
+
+    await unmount(root);
+
+    const remountRootElement = document.getElementById("root");
+    assert.ok(remountRootElement);
+    const remountRoot = createRoot(remountRootElement);
+
+    await act(async () => {
+      remountRoot.render(<DashboardPageView dashboard={dashboard} />);
+      await Promise.resolve();
+    });
+
+    assert.match(document.body.textContent ?? "", /1200\.00 TWD/);
+    assert.doesNotMatch(document.body.textContent ?? "", /1\.2K TWD/);
+    await unmount(remountRoot);
+  } finally {
+    restore();
+  }
+});
+
+test("dashboard trend chart reserves wider axis space for full amount labels", () => {
+  const compactLayout = getDashboardTrendAxisLayout("compact");
+  const fullLayout = getDashboardTrendAxisLayout("full");
+
+  assert.equal(compactLayout.yAxisWidth, 72);
+  assert.ok(fullLayout.yAxisWidth > compactLayout.yAxisWidth);
+  assert.ok(fullLayout.margin.left > compactLayout.margin.left);
 });
 
 test("dashboard page view renders a stable allocation fallback when no allocation data exists", () => {

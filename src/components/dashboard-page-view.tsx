@@ -1,6 +1,14 @@
+"use client";
+
 import Link from "next/link";
 import React from "react";
 
+import {
+  DASHBOARD_AMOUNT_DISPLAY_STORAGE_KEY,
+  type DashboardAmountDisplayMode,
+  formatDashboardAmount,
+  readDashboardAmountDisplayMode,
+} from "@/components/dashboard-amount-format";
 import { DashboardAllocationCard } from "@/components/dashboard-allocation-card";
 import { DashboardTrendCard } from "@/components/dashboard-trend-card";
 import type { DashboardRoute, DashboardSummary } from "@/modules/dashboard/service";
@@ -10,6 +18,18 @@ type DashboardPageViewProps = {
 };
 
 export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
+  const [amountDisplayMode, setAmountDisplayMode] =
+    React.useState<DashboardAmountDisplayMode>("compact");
+
+  React.useEffect(() => {
+    setAmountDisplayMode(readDashboardAmountDisplayMode(globalThis.localStorage));
+  }, []);
+
+  function changeAmountDisplayMode(mode: DashboardAmountDisplayMode) {
+    setAmountDisplayMode(mode);
+    globalThis.localStorage?.setItem(DASHBOARD_AMOUNT_DISPLAY_STORAGE_KEY, mode);
+  }
+
   if (!dashboard.latestSnapshot) {
     const emptyState = dashboard.emptyState;
 
@@ -73,15 +93,38 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
           <p className="muted">{reminderSummary}</p>
         </div>
 
-        <article className="resource-card stack dashboard-freshness">
-          <p className="eyebrow">Freshness</p>
-          <h2>{formatShortDateTime(snapshot.snapshotAt)}</h2>
-          <p className="muted">
-            {coverage?.accountCount ?? snapshot.accountCount} accounts,{" "}
-            {coverage?.holdingCount ?? snapshot.holdingCount} holdings, and{" "}
-            {coverage?.liabilityCount ?? snapshot.liabilityCount} liabilities represented in
-            the current summary.
-          </p>
+        <article className="resource-card stack dashboard-freshness dashboard-controls-card">
+          <div>
+            <p className="eyebrow">Freshness</p>
+            <h2>{formatShortDateTime(snapshot.snapshotAt)}</h2>
+            <p className="muted">
+              {coverage?.accountCount ?? snapshot.accountCount} accounts,{" "}
+              {coverage?.holdingCount ?? snapshot.holdingCount} holdings, and{" "}
+              {coverage?.liabilityCount ?? snapshot.liabilityCount} liabilities represented in
+              the current summary.
+            </p>
+          </div>
+          <fieldset className="dashboard-amount-control">
+            <legend>Amount display</legend>
+            <div className="dashboard-segmented-control">
+              <button
+                type="button"
+                className={amountDisplayMode === "compact" ? "is-active" : ""}
+                aria-pressed={amountDisplayMode === "compact"}
+                onClick={() => changeAmountDisplayMode("compact")}
+              >
+                Compact
+              </button>
+              <button
+                type="button"
+                className={amountDisplayMode === "full" ? "is-active" : ""}
+                aria-pressed={amountDisplayMode === "full"}
+                onClick={() => changeAmountDisplayMode("full")}
+              >
+                Full
+              </button>
+            </div>
+          </fieldset>
         </article>
       </div>
 
@@ -89,31 +132,57 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
         <article className="resource-card stack dashboard-highlight">
           <p className="eyebrow">Net worth</p>
           <h2>
-            {snapshot.netWorth} {snapshot.baseCurrency}
+            {formatDashboardAmount(
+              snapshot.netWorth,
+              snapshot.baseCurrency,
+              amountDisplayMode,
+            )}
           </h2>
           <p className="muted">
-            Assets {snapshot.totalAssets} {snapshot.baseCurrency} · Liabilities{" "}
-            {snapshot.totalLiabilities} {snapshot.baseCurrency}
+            Assets{" "}
+            {formatDashboardAmount(
+              snapshot.totalAssets,
+              snapshot.baseCurrency,
+              amountDisplayMode,
+            )}{" "}
+            · Liabilities{" "}
+            {formatDashboardAmount(
+              snapshot.totalLiabilities,
+              snapshot.baseCurrency,
+              amountDisplayMode,
+            )}
           </p>
         </article>
         <article className="resource-card stack">
           <p className="eyebrow">Total assets</p>
           <h2>
-            {snapshot.totalAssets} {snapshot.baseCurrency}
+            {formatDashboardAmount(
+              snapshot.totalAssets,
+              snapshot.baseCurrency,
+              amountDisplayMode,
+            )}
           </h2>
           <p className="muted">Stored account cash plus saved holding values.</p>
         </article>
         <article className="resource-card stack">
           <p className="eyebrow">Total liabilities</p>
           <h2>
-            {snapshot.totalLiabilities} {snapshot.baseCurrency}
+            {formatDashboardAmount(
+              snapshot.totalLiabilities,
+              snapshot.baseCurrency,
+              amountDisplayMode,
+            )}
           </h2>
           <p className="muted">Saved debt balances carried by the latest snapshot.</p>
         </article>
         <article className="resource-card stack">
           <p className="eyebrow">Cash position</p>
           <h2>
-            {snapshot.cashPosition} {snapshot.baseCurrency}
+            {formatDashboardAmount(
+              snapshot.cashPosition,
+              snapshot.baseCurrency,
+              amountDisplayMode,
+            )}
           </h2>
           <p className="muted">Saved cash balances from the latest formal snapshot.</p>
         </article>
@@ -154,11 +223,13 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
       <DashboardAllocationCard
         allocation={dashboard.allocation}
         baseCurrency={snapshot.baseCurrency}
+        amountDisplayMode={amountDisplayMode}
       />
 
       <DashboardTrendCard
         trendSeries={dashboard.trendSeries}
         baseCurrency={snapshot.baseCurrency}
+        amountDisplayMode={amountDisplayMode}
       />
 
       <div className="dashboard-grid dashboard-grid-secondary">

@@ -11,6 +11,10 @@ import {
   YAxis,
 } from "recharts";
 
+import {
+  type DashboardAmountDisplayMode,
+  formatDashboardAmount,
+} from "@/components/dashboard-amount-format";
 import type { DashboardTrendPoint } from "@/modules/dashboard/service";
 
 const TREND_SERIES = [
@@ -22,6 +26,7 @@ const TREND_SERIES = [
 type DashboardTrendCardProps = {
   trendSeries: DashboardTrendPoint[];
   baseCurrency: string;
+  amountDisplayMode: DashboardAmountDisplayMode;
 };
 
 type TrendDatum = {
@@ -35,6 +40,7 @@ type TrendDatum = {
 export function DashboardTrendCard({
   trendSeries,
   baseCurrency,
+  amountDisplayMode,
 }: DashboardTrendCardProps) {
   if (trendSeries.length < 2) {
     return null;
@@ -48,6 +54,7 @@ export function DashboardTrendCard({
     totalLiabilities: Number(point.totalLiabilities),
   }));
   const latestPoint = chartData[chartData.length - 1];
+  const axisLayout = getDashboardTrendAxisLayout(amountDisplayMode);
 
   return (
     <article className="resource-card stack dashboard-trend-card">
@@ -61,7 +68,7 @@ export function DashboardTrendCard({
       <div className="dashboard-trend-layout">
         <div className="dashboard-trend-chart">
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+            <LineChart data={chartData} margin={axisLayout.margin}>
               <CartesianGrid stroke="rgba(107, 111, 103, 0.16)" vertical={false} />
               <XAxis
                 dataKey="shortDate"
@@ -74,11 +81,18 @@ export function DashboardTrendCard({
                 tickLine={false}
                 tick={{ fill: "#5b6157", fontSize: 12 }}
                 tickFormatter={(value: number | string) =>
-                  formatCompactCurrency(Number(value), baseCurrency)
+                  formatDashboardAmount(Number(value), baseCurrency, amountDisplayMode)
                 }
-                width={72}
+                width={axisLayout.yAxisWidth}
               />
-              <Tooltip content={<TrendTooltip baseCurrency={baseCurrency} />} />
+              <Tooltip
+                content={
+                  <TrendTooltip
+                    baseCurrency={baseCurrency}
+                    amountDisplayMode={amountDisplayMode}
+                  />
+                }
+              />
               {TREND_SERIES.map((series) => (
                 <Line
                   key={series.key}
@@ -107,9 +121,8 @@ export function DashboardTrendCard({
                 <div className="dashboard-trend-key-row">
                   <strong>{series.label}</strong>
                   <span>
-                    {baseCurrency}{" "}
-                    {formatCompactCurrency(latestPoint[series.key], baseCurrency, {
-                      omitCurrency: true,
+                    {formatDashboardAmount(latestPoint[series.key], baseCurrency, amountDisplayMode, {
+                      currencyPosition: "prefix",
                     })}
                   </span>
                 </div>
@@ -136,9 +149,15 @@ export function DashboardTrendCard({
           {chartData.map((point) => (
             <tr key={point.snapshotAt}>
               <th scope="row">{point.shortDate}</th>
-              <td>{formatCompactCurrency(point.netWorth, baseCurrency)}</td>
-              <td>{formatCompactCurrency(point.totalAssets, baseCurrency)}</td>
-              <td>{formatCompactCurrency(point.totalLiabilities, baseCurrency)}</td>
+              <td>{formatDashboardAmount(point.netWorth, baseCurrency, amountDisplayMode)}</td>
+              <td>{formatDashboardAmount(point.totalAssets, baseCurrency, amountDisplayMode)}</td>
+              <td>
+                {formatDashboardAmount(
+                  point.totalLiabilities,
+                  baseCurrency,
+                  amountDisplayMode,
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -155,9 +174,16 @@ type TrendTooltipProps = {
     value?: number | string;
   }>;
   baseCurrency: string;
+  amountDisplayMode: DashboardAmountDisplayMode;
 };
 
-function TrendTooltip({ active, label, payload, baseCurrency }: TrendTooltipProps) {
+function TrendTooltip({
+  active,
+  label,
+  payload,
+  baseCurrency,
+  amountDisplayMode,
+}: TrendTooltipProps) {
   if (!active || !payload?.length) {
     return null;
   }
@@ -168,12 +194,19 @@ function TrendTooltip({ active, label, payload, baseCurrency }: TrendTooltipProp
       <div className="stack">
         {payload.map((entry) => (
           <span key={entry.name}>
-            {entry.name}: {formatCompactCurrency(Number(entry.value ?? 0), baseCurrency)}
+            {entry.name}:{" "}
+            {formatDashboardAmount(Number(entry.value ?? 0), baseCurrency, amountDisplayMode)}
           </span>
         ))}
       </div>
     </div>
   );
+}
+
+export function getDashboardTrendAxisLayout(mode: DashboardAmountDisplayMode) {
+  return mode === "full"
+    ? { yAxisWidth: 116, margin: { top: 8, right: 8, left: 8, bottom: 0 } }
+    : { yAxisWidth: 72, margin: { top: 8, right: 8, left: -20, bottom: 0 } };
 }
 
 function formatShortDate(value: string) {
@@ -182,23 +215,4 @@ function formatShortDate(value: string) {
     day: "numeric",
     timeZone: "UTC",
   });
-}
-
-function formatCompactCurrency(
-  value: number,
-  currency: string,
-  options: { omitCurrency?: boolean } = {},
-) {
-  const formatted = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    notation: "compact",
-    maximumFractionDigits: value >= 1000 ? 1 : 2,
-  }).format(value);
-
-  if (!options.omitCurrency) {
-    return formatted;
-  }
-
-  return formatted.replace(/^[^0-9-]+/, "");
 }
