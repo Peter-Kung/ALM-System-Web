@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation";
 
 import { useWorkspaceMutation } from "@/components/workspace-mutation-boundary";
 
+type LoginRouter = {
+  replace(path: Route): void;
+  refresh(): void;
+};
+
+type LoginFetch = typeof fetch;
+
 export function LoginFormFields({
   nextPath,
   pending,
@@ -51,6 +58,19 @@ export function LoginFormFields({
 
 export function LoginForm({ nextPath }: { nextPath?: string }) {
   const router = useRouter();
+
+  return <LoginFormWithDependencies nextPath={nextPath} router={router} fetcher={fetch} />;
+}
+
+export function LoginFormWithDependencies({
+  nextPath,
+  router,
+  fetcher,
+}: {
+  nextPath?: string;
+  router: LoginRouter;
+  fetcher: LoginFetch;
+}) {
   const { isPending, runWorkspaceMutation } = useWorkspaceMutation();
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +82,7 @@ export function LoginForm({ nextPath }: { nextPath?: string }) {
       setError(null);
 
       const formData = new FormData(form);
-      const response = await fetch("/api/auth/login", {
+      const response = await fetcher("/api/auth/login", {
         method: "POST",
         headers: {
           "content-type": "application/json",

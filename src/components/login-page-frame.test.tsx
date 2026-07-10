@@ -42,5 +42,6 @@ test("login page frame can use the shared blocking mutation overlay", () => {
   assert.match(markup, /Workspace update in progress/);
   assert.match(markup, /Please wait/);
   assert.match(markup, /Signing in\.\.\./);
+  assert.match(markup, /<button type="submit" disabled="">Signing in\.\.\.<\/button>/);
   assert.match(markup, /aria-busy="true"/);
 });

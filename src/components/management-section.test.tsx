@@ -28,7 +28,23 @@ test("accounts management section renders the split editor and card-list templat
   assert.match(markup, /Active accounts/);
   assert.match(markup, /Create account/);
   assert.match(markup, /Loading accounts\.\.\./);
+  assert.doesNotMatch(markup, /Workspace update in progress/);
   assert.match(markup, /management-grid management-grid-accounts/);
+});
+
+test("accounts management section can be locked by the shared mutation overlay", () => {
+  const markup = renderToStaticMarkup(
+    <WorkspaceMutationBoundary initiallyPending>
+      <ManagementSection section="accounts" />
+    </WorkspaceMutationBoundary>,
+  );
+
+  assert.match(markup, /Account editor/);
+  assert.match(markup, /Create account/);
+  assert.match(markup, /Workspace update in progress/);
+  assert.match(markup, /temporarily locked/);
+  assert.match(markup, /aria-busy="true"/);
+  assert.match(markup, /inert=""/);
 });
 
 test("asset symbol guidance only appears for auto-priced assets", () => {

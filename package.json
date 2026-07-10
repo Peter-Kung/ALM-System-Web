@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "test": "tsx --test src/modules/auth/login-payload.test.ts src/modules/auth/account-payload.test.ts src/modules/auth/service.test.ts src/modules/accounts/account-status.test.ts src/modules/valuation/service.test.ts src/modules/snapshots/service.test.ts src/modules/dashboard/service.test.ts src/lib/navigation.test.ts src/lib/date-format.test.ts src/components/app-shell-frame.test.tsx src/components/login-page-frame.test.tsx src/components/dashboard-page-view.test.tsx src/components/management-section.test.tsx src/components/workspace-mutation-boundary.test.tsx 'src/app/(authenticated)/dashboard/page.test.tsx' 'src/app/(authenticated)/manage/[section]/page.test.tsx' src/app/api/app/account/route.test.ts src/app/api/auth/logout/route.test.ts",
+    "test": "tsx --test src/modules/auth/login-payload.test.ts src/modules/auth/account-payload.test.ts src/modules/auth/service.test.ts src/modules/accounts/account-status.test.ts src/modules/valuation/service.test.ts src/modules/snapshots/service.test.ts src/modules/dashboard/service.test.ts src/lib/navigation.test.ts src/lib/date-format.test.ts src/components/app-shell-frame.test.tsx src/components/login-page-frame.test.tsx src/components/dashboard-page-view.test.tsx src/components/management-section.test.tsx src/components/workspace-mutation-boundary.test.tsx src/components/workspace-mutation-interactions.test.tsx 'src/app/(authenticated)/dashboard/page.test.tsx' 'src/app/(authenticated)/manage/[section]/page.test.tsx' src/app/api/app/account/route.test.ts src/app/api/auth/logout/route.test.ts",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate"
@@ -22,9 +22,11 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/jsdom": "^21.1.7",
     "@types/node": "^22.15.30",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "jsdom": "^22.1.0",
     "prisma": "^6.11.1",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"

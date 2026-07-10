@@ -2,6 +2,11 @@
 
 import React, { createContext, ReactNode, useContext, useMemo, useRef, useState } from "react";
 
+import {
+  WorkspaceMutationController,
+  createWorkspaceMutationController,
+} from "@/components/workspace-mutation-state";
+
 type WorkspaceMutationContextValue = {
   isPending: boolean;
   runWorkspaceMutation<T>(operation: () => Promise<T>): Promise<T | undefined>;
@@ -18,35 +23,25 @@ export function WorkspaceMutationBoundary({
   children,
   initiallyPending = false,
 }: WorkspaceMutationBoundaryProps) {
-  const [pendingCount, setPendingCount] = useState(initiallyPending ? 1 : 0);
-  const pendingCountRef = useRef(pendingCount);
+  const [isPending, setIsPending] = useState(initiallyPending);
+  const controllerRef = useRef<WorkspaceMutationController | null>(null);
 
-  function setTrackedPendingCount(nextCount: number) {
-    pendingCountRef.current = nextCount;
-    setPendingCount(nextCount);
+  if (!controllerRef.current) {
+    controllerRef.current = createWorkspaceMutationController({
+      initiallyPending,
+      onPendingChange: setIsPending,
+    });
   }
 
   const contextValue = useMemo<WorkspaceMutationContextValue>(
     () => ({
-      isPending: pendingCount > 0,
+      isPending,
       async runWorkspaceMutation<T>(operation: () => Promise<T>) {
-        if (pendingCountRef.current > 0) {
-          return undefined;
-        }
-
-        setTrackedPendingCount(pendingCountRef.current + 1);
-
-        try {
-          return await operation();
-        } finally {
-          setTrackedPendingCount(Math.max(0, pendingCountRef.current - 1));
-        }
+        return controllerRef.current?.run(operation);
       },
     }),
-    [pendingCount],
+    [isPending],
   );
-
-  const isPending = pendingCount > 0;
 
   return (
     <WorkspaceMutationContext.Provider value={contextValue}>
