@@ -492,6 +492,17 @@ button:disabled {
   align-items: start;
 }
 
+.account-settings-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 30rem) minmax(16rem, 1fr);
+  align-items: start;
+}
+
+.account-settings-card {
+  width: 100%;
+}
+
 .management-highlight-grid {
   display: grid;
   gap: 1rem;
@@ -812,6 +823,7 @@ button:disabled {
 
 @media (max-width: 900px) {
   .login-layout,
+  .account-settings-grid,
   .management-grid,
   .management-highlight-grid,
   .field-row,
