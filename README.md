@@ -47,8 +47,8 @@ details, start with [docs/index.md](docs/index.md).
 6. Open `http://localhost:3000`.
 
 This repo requires `DATABASE_URL` to be set for Prisma commands and app
-runtime. In development, the app falls back to these credential and session
-defaults when you do not set environment variables:
+runtime. In development, the app falls back to these initial owner bootstrap
+and session defaults when you do not set environment variables:
 
 - Username: `owner`
 - Password: `change-me`
@@ -56,7 +56,10 @@ defaults when you do not set environment variables:
 
 You can override the initial owner bootstrap credentials with `APP_USERNAME`
 and `APP_PASSWORD`, and override runtime configuration with `SESSION_SECRET`
-and `DATABASE_URL`.
+and `DATABASE_URL`. After the owner account has a stored password hash, normal
+sign-ins use the account credentials in the database. The `APP_USERNAME` and
+`APP_PASSWORD` values remain compatibility inputs for initialization or upgrade
+when no stored password hash exists yet.
 
 ## Common commands
 
@@ -70,9 +73,9 @@ and `DATABASE_URL`.
 
 1. Open `http://localhost:3000`.
 2. The app redirects protected routes to `/login`.
-3. Sign in with the configured owner credentials. On the first successful
-   sign-in, the app stores the owner password hash in the database and later
-   sign-ins use the stored account credentials.
+3. Sign in with the owner credentials. On the first successful sign-in, the app
+   stores the owner password hash in the database and later sign-ins use the
+   stored account credentials.
 
 By default, when `APP_USERNAME` and `APP_PASSWORD` are unset, use:
 
@@ -80,6 +83,16 @@ By default, when `APP_USERNAME` and `APP_PASSWORD` are unset, use:
    - Password: `change-me`
 
 After a successful sign-in, the app redirects to the dashboard.
+
+## Account settings
+
+The app remains a single-user workspace. The signed-in owner can change the
+username, password, or both from `Settings` > `Account`.
+
+Credential changes require the current password. Password changes also require
+a matching confirmation value. After a successful credential change, the app
+clears the current session and redirects to `/login`. Sign in again with the
+updated username or password.
 
 ## Local usage flow
 
