@@ -179,6 +179,58 @@ test("updateAccountCredentials updates the username and password after validatin
   assert.equal(await verifyPassword("new-password", user.passwordHash), true);
 });
 
+test("updateAccountCredentials makes password-only changes reject the old password", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("current-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const user = await updateAccountCredentials(
+    {
+      userId: "user-1",
+      currentPassword: "current-password",
+      newPassword: "new-password",
+      confirmNewPassword: "new-password",
+    },
+    repository,
+  );
+
+  assert.equal(user.username, "owner");
+  assert.ok(user.passwordHash);
+  assert.equal(await verifyPassword("new-password", user.passwordHash), true);
+  assert.equal(await verifyPassword("current-password", user.passwordHash), false);
+  assert.ok(await validateOwnerLogin("owner", "new-password", repository));
+  assert.equal(await validateOwnerLogin("owner", "current-password", repository), null);
+});
+
+test("updateAccountCredentials makes username-only changes require the new username for sign-in", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("current-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const user = await updateAccountCredentials(
+    {
+      userId: "user-1",
+      currentPassword: "current-password",
+      username: "owner.next",
+    },
+    repository,
+  );
+
+  assert.equal(user.username, "owner.next");
+  assert.ok(await validateOwnerLogin("owner.next", "current-password", repository));
+  assert.equal(await validateOwnerLogin("owner", "current-password", repository), null);
+});
+
 test("updateAccountCredentials backfills the legacy password hash before saving changes", async () => {
   const repository = createRepositoryFixture([
     {
