@@ -1,8 +1,19 @@
-import { Prisma } from "@prisma/client";
+import { type Asset, Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import type { PrismaExecutor } from "@/lib/prisma-executor";
 import { assertNonEmptyString } from "@/lib/repository-utils";
+
+type AssetWithRelations = Prisma.AssetGetPayload<{
+  include: { holdings: true; priceRecords: true };
+}>;
+
+export type AssetRepository = {
+  create(data: Prisma.AssetUncheckedCreateInput): PromiseLike<Asset>;
+  findById(id: string): PromiseLike<AssetWithRelations | null>;
+  listByUser(userId: string): PromiseLike<AssetWithRelations[]>;
+  update(id: string, data: Prisma.AssetUncheckedUpdateInput): PromiseLike<Asset>;
+};
 
 export function createAssetRepository(db: PrismaExecutor = prisma) {
   return {
