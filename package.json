@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "test": "tsx --test src/modules/auth/login-payload.test.ts src/modules/auth/account-payload.test.ts src/modules/auth/service.test.ts src/modules/valuation/service.test.ts src/modules/snapshots/service.test.ts src/modules/dashboard/service.test.ts src/lib/navigation.test.ts src/lib/date-format.test.ts src/components/app-shell-frame.test.tsx src/components/login-page-frame.test.tsx src/components/dashboard-page-view.test.tsx src/components/management-section.test.tsx src/components/workspace-mutation-boundary.test.tsx 'src/app/(authenticated)/dashboard/page.test.tsx' 'src/app/(authenticated)/manage/[section]/page.test.tsx' src/app/api/accounts/[accountId]/route.test.ts src/app/api/app/account/route.test.ts",
+    "test": "tsx --test src/modules/auth/login-payload.test.ts src/modules/auth/account-payload.test.ts src/modules/auth/service.test.ts src/modules/valuation/service.test.ts src/modules/snapshots/service.test.ts src/modules/dashboard/service.test.ts src/lib/navigation.test.ts src/lib/date-format.test.ts src/components/app-shell-frame.test.tsx src/components/login-page-frame.test.tsx src/components/dashboard-page-view.test.tsx src/components/management-section.test.tsx src/components/workspace-mutation-boundary.test.tsx 'src/app/(authenticated)/dashboard/page.test.tsx' 'src/app/(authenticated)/manage/[section]/page.test.tsx' src/app/api/accounts/[accountId]/route.test.ts src/app/api/app/account/route.test.ts src/app/api/auth/logout/route.test.ts",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate"
