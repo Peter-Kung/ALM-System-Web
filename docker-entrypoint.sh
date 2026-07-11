@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+: "${ALM_STORAGE_ROOT:=/var/lib/alm-system}"
+: "${ALM_DATA_DIR:=$ALM_STORAGE_ROOT/data}"
+: "${ALM_BACKUP_DIR:=$ALM_STORAGE_ROOT/backups}"
+: "${ALM_UPDATE_STATE_DIR:=$ALM_STORAGE_ROOT/update-state}"
+: "${ALM_UPLOADS_DIR:=$ALM_STORAGE_ROOT/uploads}"
+: "${DATABASE_URL:=file:$ALM_DATA_DIR/alm-system.db}"
+
+export ALM_STORAGE_ROOT
+export ALM_DATA_DIR
+export ALM_BACKUP_DIR
+export ALM_UPDATE_STATE_DIR
+export ALM_UPLOADS_DIR
+export DATABASE_URL
+
+mkdir -p "$ALM_DATA_DIR" "$ALM_BACKUP_DIR" "$ALM_UPDATE_STATE_DIR" "$ALM_UPLOADS_DIR"
+
+npx prisma migrate deploy
+
+exec "$@"

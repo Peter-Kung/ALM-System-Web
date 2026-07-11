@@ -1,5 +1,10 @@
-const defaultDatabaseUrl = "file:./dev.db";
+import { runtimePaths } from "@/lib/runtime-paths";
+
 const isDevelopment = process.env.NODE_ENV !== "production";
+
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = runtimePaths.databaseUrl;
+}
 
 function getOptionalSecret(name: string, developmentFallback?: string) {
   const value = process.env[name];
@@ -23,7 +28,8 @@ export const env = {
     "SESSION_SECRET",
     "development-session-secret-change-me",
   ),
-  databaseUrl: process.env.DATABASE_URL ?? defaultDatabaseUrl,
+  databaseUrl: runtimePaths.databaseUrl,
+  runtimePaths,
 };
 
 export function getConfiguredAdminCredentials() {
