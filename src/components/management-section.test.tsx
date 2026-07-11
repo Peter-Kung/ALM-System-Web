@@ -242,7 +242,7 @@ test("users management section renders admin controls without password fields", 
   assertStickyActionColumn(markup, "Create user", "User directory");
 });
 
-test("users management actions show pending self-managed onboarding status", async () => {
+test("users management actions show the Telegram binding code returned by the activation request", async () => {
   const { document, root, restore } = createDom();
   const previousFetch = globalThis.fetch;
 
@@ -271,7 +271,10 @@ test("users management actions show pending self-managed onboarding status", asy
       init?.method === "POST"
     ) {
       return Response.json(
-        { delivery: "pending_self_managed_onboarding" },
+        {
+          bindingCode: "tg-bind-123",
+          delivery: "share_telegram_binding_code",
+        },
         { status: 202 },
       );
     }
@@ -303,7 +306,7 @@ test("users management actions show pending self-managed onboarding status", asy
 
     assert.match(
       document.body.textContent ?? "",
-      /member is waiting for the self-managed onboarding flow; no password was issued\./,
+      /Share this Telegram binding code with member: tg-bind-123/,
     );
     assert.doesNotMatch(document.body.textContent ?? "", /Activation requested for member/);
   } finally {

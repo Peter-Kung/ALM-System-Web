@@ -16,6 +16,7 @@ import type { ManagedUser, UserManagementRepository } from "@/modules/users";
 function createManagedUserFixture(overrides: Partial<ManagedUser>): ManagedUser {
   return {
     id: "user-1",
+    telegramChatId: null,
     username: "owner",
     role: "ADMIN",
     isActive: true,
@@ -428,4 +429,34 @@ test("requestUserPasswordResetHandler returns no usable password", async () => {
   assert.equal(typeof body.expiresAt, "string");
   assert.equal("password" in body, false);
   assert.equal("temporaryPassword" in body, false);
+});
+
+test("requestUserActivationHandler returns a Telegram binding code for admins to share", async () => {
+  const repository = createRepositoryFixture();
+  const familyUser = await repository.create({
+    isActive: false,
+    role: "USER",
+    username: "family",
+  });
+  const response = await requestUserActivationHandler(familyUser.id, {
+    createRepository: () => repository,
+    async requireSession() {
+      return {
+        response: null,
+        session: {
+          sub: "admin-user",
+          username: "admin",
+          role: "ADMIN",
+          sessionVersion: 0,
+        },
+      };
+    },
+  });
+
+  assert.equal(response.status, 202);
+  const body = await response.json();
+  assert.equal(body.delivery, "share_telegram_binding_code");
+  assert.equal(body.user.username, "family");
+  assert.equal(body.tokenType, "TELEGRAM_BINDING");
+  assert.equal(typeof body.bindingCode, "string");
 });

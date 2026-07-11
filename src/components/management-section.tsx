@@ -404,6 +404,7 @@ function UsersManager() {
           method: "POST",
         });
         const payload = (await response.json()) as {
+          bindingCode?: string;
           delivery?: string;
           error?: string;
         };
@@ -412,7 +413,14 @@ function UsersManager() {
           throw new Error(payload.error ?? "Failed to request user onboarding action.");
         }
 
-        setStatusMessage(formatUserActionStatus(user.username, action, payload.delivery));
+        setStatusMessage(
+          formatUserActionStatus(
+            user.username,
+            action,
+            payload.delivery,
+            payload.bindingCode,
+          ),
+        );
       } catch (requestError) {
         setError(
           requestError instanceof Error
@@ -545,7 +553,12 @@ function formatUserActionStatus(
   username: string,
   action: "activation-request" | "password-reset-request",
   delivery?: string,
+  bindingCode?: string,
 ) {
+  if (delivery === "share_telegram_binding_code" && bindingCode) {
+    return `Share this Telegram binding code with ${username}: ${bindingCode}`;
+  }
+
   if (delivery === "pending_self_managed_onboarding") {
     return `${username} is waiting for the self-managed onboarding flow; no password was issued.`;
   }

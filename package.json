@@ -13,7 +13,7 @@
     "db:migrate": "node scripts/run-prisma-command.mjs migrate dev",
     "db:migrate:deploy": "node scripts/run-prisma-command.mjs migrate deploy",
     "db:generate": "node scripts/run-prisma-command.mjs generate",
-    "worker:telegram": "node scripts/telegram-bot-worker.cjs"
+    "worker:telegram": "tsx scripts/telegram-bot-worker.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.11.1",

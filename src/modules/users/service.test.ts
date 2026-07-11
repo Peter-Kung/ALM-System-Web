@@ -16,6 +16,7 @@ import {
 function createManagedUserFixture(overrides: Partial<ManagedUser>): ManagedUser {
   return {
     id: "user-1",
+    telegramChatId: null,
     username: "owner",
     role: "ADMIN",
     isActive: true,
@@ -392,7 +393,7 @@ test("requestManagedUserPasswordReset does not return a password", async () => {
   );
 });
 
-test("requestManagedUserActivation returns activation metadata without a usable token", async () => {
+test("requestManagedUserActivation returns a Telegram binding code for the admin to share", async () => {
   const repository = createRepositoryFixture([
     {
       id: "family-user",
@@ -402,26 +403,25 @@ test("requestManagedUserActivation returns activation metadata without a usable 
     },
   ]);
 
-  assert.deepEqual(
-    await requestManagedUserActivation(
-      "family-user",
-      repository,
-      new Date("2026-07-11T00:00:00Z"),
-    ),
-    {
-      user: {
-        id: "family-user",
-        username: "family",
-        role: "USER",
-        isActive: false,
-        sessionVersion: 0,
-        lastLoginAt: null,
-        createdAt: "2026-07-01T00:00:00.000Z",
-        updatedAt: "2026-07-01T00:00:00.000Z",
-      },
-      delivery: "pending_self_managed_onboarding",
-      expiresAt: "2026-07-11T00:05:00.000Z",
-      tokenType: "ACCOUNT_ACTIVATION",
-    },
+  const result = await requestManagedUserActivation(
+    "family-user",
+    repository,
+    new Date("2026-07-11T00:00:00Z"),
   );
+
+  assert.deepEqual(result.user, {
+    id: "family-user",
+    username: "family",
+    role: "USER",
+    isActive: false,
+    sessionVersion: 0,
+    lastLoginAt: null,
+    createdAt: "2026-07-01T00:00:00.000Z",
+    updatedAt: "2026-07-01T00:00:00.000Z",
+  });
+  assert.equal(result.delivery, "share_telegram_binding_code");
+  assert.equal(result.expiresAt, "2026-07-11T00:05:00.000Z");
+  assert.equal(result.tokenType, "TELEGRAM_BINDING");
+  assert.equal(typeof result.bindingCode, "string");
+  assert.ok(result.bindingCode.length > 10);
 });

@@ -257,13 +257,14 @@ wait_for_health() {
 
 compose_pull_up() {
   local image="$1"
+  local services=(app bot-worker)
 
   (
     cd "$deploy_root"
-    if ! ALM_IMAGE="$image" "${compose_bin[@]}" pull app; then
+    if ! ALM_IMAGE="$image" "${compose_bin[@]}" pull "${services[@]}"; then
       return 1
     fi
-    if ! ALM_IMAGE="$image" "${compose_bin[@]}" up -d app; then
+    if ! ALM_IMAGE="$image" "${compose_bin[@]}" up -d "${services[@]}"; then
       return 1
     fi
   )
@@ -271,19 +272,22 @@ compose_pull_up() {
 
 compose_up_with_image() {
   local image="$1"
+  local services=(app bot-worker)
 
   (
     cd "$deploy_root"
-    if ! ALM_IMAGE="$image" "${compose_bin[@]}" up -d app; then
+    if ! ALM_IMAGE="$image" "${compose_bin[@]}" up -d "${services[@]}"; then
       return 1
     fi
   )
 }
 
 compose_stop() {
+  local services=(app bot-worker)
+
   (
     cd "$deploy_root"
-    if ! "${compose_bin[@]}" stop app; then
+    if ! "${compose_bin[@]}" stop "${services[@]}"; then
       return 1
     fi
   )

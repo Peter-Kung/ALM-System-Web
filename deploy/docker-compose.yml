@@ -33,3 +33,37 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+
+  bot-worker:
+    image: ${ALM_IMAGE:-ghcr.io/peter-kung/alm-system-web:latest}
+    container_name: ${ALM_CONTAINER_NAME:-alm-system}-bot-worker
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      ALM_BACKUP_DIR: /var/lib/alm-system/backups
+      ALM_DATA_DIR: /var/lib/alm-system/data
+      ALM_SKIP_PRISMA_MIGRATE: "1"
+      ALM_STORAGE_ROOT: /var/lib/alm-system
+      ALM_UPDATE_STATE_DIR: /var/lib/alm-system/update-state
+      ALM_UPLOADS_DIR: /var/lib/alm-system/uploads
+      DATABASE_URL: file:/var/lib/alm-system/data/alm-system.db
+      NODE_ENV: production
+    depends_on:
+      app:
+        condition: service_healthy
+    command:
+      - sh
+      - -lc
+      - >-
+        if [ -n "$${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "$${APP_BASE_URL:-}" ]; then
+          npm run worker:telegram;
+        else
+          echo "[bot-worker] TELEGRAM_BOT_TOKEN or APP_BASE_URL is not configured; worker is idle.";
+          tail -f /dev/null;
+        fi
+    volumes:
+      - ${ALM_DEPLOY_ROOT:-.}/data:/var/lib/alm-system/data
+      - ${ALM_DEPLOY_ROOT:-.}/backups:/var/lib/alm-system/backups
+      - ${ALM_DEPLOY_ROOT:-.}/update-state:/var/lib/alm-system/update-state
+      - ${ALM_DEPLOY_ROOT:-.}/uploads:/var/lib/alm-system/uploads

@@ -6,6 +6,7 @@ import type { PrismaExecutor } from "@/lib/prisma-executor";
 export type ManagedUser = Pick<
   User,
   | "id"
+  | "telegramChatId"
   | "username"
   | "role"
   | "isActive"
@@ -30,6 +31,7 @@ export type ManagedUserActionToken = Pick<
 
 const managedUserSelect = {
   id: true,
+  telegramChatId: true,
   username: true,
   role: true,
   isActive: true,

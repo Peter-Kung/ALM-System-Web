@@ -22,6 +22,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./backups:/var/lib/alm-system/backups
+      - ./update-state:/var/lib/alm-system/update-state
       - ./uploads:/var/lib/alm-system/uploads
 
   bot-worker:
@@ -44,6 +45,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./backups:/var/lib/alm-system/backups
+      - ./update-state:/var/lib/alm-system/update-state
       - ./uploads:/var/lib/alm-system/uploads
 
   postgres:

@@ -9,6 +9,10 @@ import {
   type AuthRepository,
   type AuthUser,
 } from "@/modules/auth/repository";
+import {
+  consumeUserActionToken,
+  type UserActionTokenRepository,
+} from "@/modules/auth/action-token";
 
 const PASSWORD_SALT_ROUNDS = 12;
 const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
@@ -25,6 +29,12 @@ export type CreateFirstAdministratorInput = {
   confirmPassword: string;
   password: string;
   username: string;
+};
+
+export type ActivateAccountInput = {
+  confirmPassword: string;
+  password: string;
+  token: string;
 };
 
 export type AuthenticatedUserSession = SessionPayload;
@@ -192,6 +202,40 @@ export async function createFirstAdministrator(
 
     throw error;
   }
+}
+
+export async function activateAccountFromToken(
+  input: ActivateAccountInput,
+  repository: AuthRepository & UserActionTokenRepository = createAuthRepository(),
+  now: Date = new Date(),
+) {
+  validateNextPassword(input.password, input.confirmPassword);
+  const passwordHash = await hashPassword(input.password);
+
+  return repository.withTransaction(async (transactionRepository) => {
+    const authTransactionRepository =
+      transactionRepository as AuthRepository & UserActionTokenRepository;
+    const consumedToken = await consumeUserActionToken(
+      input.token,
+      "ACCOUNT_ACTIVATION",
+      authTransactionRepository,
+      now,
+    );
+    if (!consumedToken) {
+      throw new RepositoryValidationError("Activation link is invalid or expired.");
+    }
+
+    const user = await authTransactionRepository.findById(consumedToken.userId);
+    if (!user) {
+      throw new RepositoryValidationError("Activation link is invalid or expired.");
+    }
+
+    return authTransactionRepository.update(user.id, {
+      isActive: true,
+      passwordHash,
+      sessionVersion: user.passwordHash ? { increment: 1 } : undefined,
+    });
+  });
 }
 
 export async function validateSessionPayload(

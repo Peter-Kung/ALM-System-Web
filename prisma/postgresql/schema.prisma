@@ -84,6 +84,7 @@ model User {
   id             String      @id @default(cuid())
   username       String      @unique
   passwordHash   String?
+  telegramChatId String?     @unique
   role           UserRole    @default(ADMIN)
   isActive       Boolean     @default(true)
   sessionVersion Int         @default(0)

@@ -160,14 +160,15 @@ export async function requestManagedUserActivation(
 
   const actionToken = await issueUserActionToken(
     user.id,
-    "ACCOUNT_ACTIVATION",
+    "TELEGRAM_BINDING",
     repository,
     now,
   );
 
   return {
+    bindingCode: actionToken.token,
     user: serializeUser(user),
-    delivery: "pending_self_managed_onboarding" as const,
+    delivery: "share_telegram_binding_code" as const,
     expiresAt: actionToken.expiresAt.toISOString(),
     tokenType: actionToken.tokenType,
   };
