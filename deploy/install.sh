@@ -72,6 +72,32 @@ install_compose_template() {
   mv "$temp_template" "$destination"
 }
 
+install_update_script() {
+  local destination="$1"
+  local local_script="${script_dir}/update.sh"
+  local temp_script
+
+  if [ -n "$script_dir" ] && [ -f "$local_script" ]; then
+    temp_script="$(mktemp "${destination}.tmp.XXXXXX")"
+    install -m 0755 "$local_script" "$temp_script"
+  else
+    temp_script="$(mktemp "${destination}.tmp.XXXXXX")"
+    if ! curl -fsSL "${source_base}/update.sh" -o "$temp_script"; then
+      rm -f "$temp_script"
+      return 1
+    fi
+    chmod 0755 "$temp_script"
+  fi
+
+  if ! bash -n "$temp_script"; then
+    rm -f "$temp_script"
+    echo "Downloaded update script is not valid." >&2
+    exit 1
+  fi
+
+  mv "$temp_script" "$destination"
+}
+
 mkdir -p "$deploy_root"/{data,backups,update-state,uploads}
 chmod 0700 "$deploy_root" "$deploy_root"/{data,backups,update-state,uploads}
 
@@ -99,6 +125,7 @@ else
 fi
 
 install_compose_template "${deploy_root}/docker-compose.yml"
+install_update_script "${deploy_root}/update.sh"
 
 (
   cd "$deploy_root"

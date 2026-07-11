@@ -69,6 +69,7 @@ uploaded files.
 | --- | --- |
 | `.env` | Runtime settings, setup token, session secret, image, port, and container name. |
 | `docker-compose.yml` | Compose definition for the single application container. |
+| `update.sh` | Host-side update, rollback, and update-status command. |
 | `data/` | SQLite database storage. |
 | `backups/` | Database backups created before future update operations. |
 | `update-state/` | Update state and failure details for future update operations. |
@@ -105,4 +106,83 @@ Change the bind address or port by editing `ALM_HTTP_BIND` or `ALM_HTTP_PORT` in
 ```bash
 cd /opt/alm-system
 sudo docker compose up -d
+```
+
+## Update
+
+Use the host update command from the deployment root:
+
+```bash
+cd /opt/alm-system
+sudo ./update.sh update
+```
+
+By default, the command updates to
+`ghcr.io/peter-kung/alm-system-web:latest`. To update to a specific published
+image tag, pass the full image name:
+
+```bash
+cd /opt/alm-system
+sudo ./update.sh update ghcr.io/peter-kung/alm-system-web:sha-<commit-sha>
+```
+
+The update command performs these steps:
+
+1. Reads the current image and HTTP settings from `.env`.
+2. Creates a SQLite database backup under `backups/` when the database exists.
+3. Records `running` update state under `update-state/last-update.json`.
+4. Updates `ALM_IMAGE` in `.env`.
+5. Pulls the target image and recreates the application container with Docker
+   Compose.
+6. Lets the container entrypoint run database migrations.
+7. Validates the updated app with `/api/health`.
+
+When validation succeeds, `update-state/last-update.json` records `succeeded`,
+the previous image, the target image, the active image, the backup path, and the
+update time.
+
+## Rollback
+
+If image pull, startup, migration, or health validation fails, the update
+command automatically restores the previous image, restores the pre-update
+SQLite backup when one was created, recreates the container, and validates
+health again.
+
+For mutable tags such as `latest`, the update command resolves the currently
+running image to an immutable digest before it changes the deployment. A
+successful rollback can leave `ALM_IMAGE` in `.env` set to that digest so the
+host starts the exact previous image instead of resolving the mutable tag again.
+
+The update state records `rolled_back` when automatic rollback succeeds. It
+records `rollback_failed` when the previous image does not become healthy.
+Inspect container logs before retrying:
+
+```bash
+cd /opt/alm-system
+sudo docker compose logs app
+```
+
+To manually roll back to the previous image recorded in the last update state
+while preserving the current database, run:
+
+```bash
+cd /opt/alm-system
+sudo ./update.sh rollback
+```
+
+Manual rollback does not restore the pre-update database backup by default
+because the updated system may have accepted new data after the update
+succeeded. To restore the recorded pre-update database backup as a destructive
+recovery action, run:
+
+```bash
+cd /opt/alm-system
+sudo ./update.sh rollback --restore-database
+```
+
+To inspect the last update result, run:
+
+```bash
+cd /opt/alm-system
+sudo ./update.sh status
 ```
