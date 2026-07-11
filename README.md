@@ -93,6 +93,16 @@ only when an existing deployment upgrades from the older fixed-credential
 single-user model. After a user has a stored password hash, normal sign-ins
 always use the database-backed user credentials.
 
+`npm run db:generate` only updates the local Prisma Client. It does not change
+the SQLite database schema. Use `npm run db:migrate` to apply pending Prisma
+migrations while preserving existing local data. Do not use
+`prisma migrate reset` if you need to keep accounts, assets, holdings,
+liabilities, prices, snapshots, or users in the local database.
+
+`npm run dev` also runs `prisma migrate deploy` before the dev server starts, so
+an existing local database receives checked-in migrations before the app queries
+new columns.
+
 ## Self-hosted Docker deployment
 
 The supported Docker deployment is a single-host Docker Compose installation.
@@ -111,7 +121,7 @@ deployment flow.
 - Run tests: `npm run test`
 - Run TypeScript checks: `npm run typecheck`
 - Generate Prisma client: `npm run db:generate`
-- Apply local Prisma migrations: `npm run db:migrate`
+- Apply local Prisma migrations while preserving data: `npm run db:migrate`
 
 ## Sign in
 
