@@ -3,4 +3,7 @@ node_modules
 prisma/dev.db
 prisma/dev.db-journal
 .env
+deploy/family/.env
+deploy/family/backups/
+deploy/family/uploads/
 tsconfig.tsbuildinfo

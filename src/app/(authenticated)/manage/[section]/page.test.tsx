@@ -4,9 +4,8 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import ManagementSectionPage, {
-  canCurrentUserAccessManagementSection,
-} from "@/app/(authenticated)/manage/[section]/page";
+import { canCurrentUserAccessManagementSection } from "@/app/(authenticated)/manage/[section]/access";
+import ManagementSectionPage from "@/app/(authenticated)/manage/[section]/page";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 
 test("manage accounts route renders the account editor and list regions", async () => {

@@ -1,0 +1,63 @@
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        PRISMA_SCHEMA_PATH: prisma/postgresql/schema.prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    environment:
+      HOSTNAME: 0.0.0.0
+      NODE_ENV: production
+      PORT: 3000
+      PRISMA_SCHEMA_PATH: prisma/postgresql/schema.prisma
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    restart: unless-stopped
+    volumes:
+      - ./backups:/var/lib/alm-system/backups
+      - ./uploads:/var/lib/alm-system/uploads
+
+  bot-worker:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        PRISMA_SCHEMA_PATH: prisma/postgresql/schema.prisma
+    command: ["npm", "run", "worker:telegram"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    environment:
+      ALM_SKIP_PRISMA_MIGRATE: "1"
+      NODE_ENV: production
+      PRISMA_SCHEMA_PATH: prisma/postgresql/schema.prisma
+    restart: unless-stopped
+    volumes:
+      - ./backups:/var/lib/alm-system/backups
+      - ./uploads:/var/lib/alm-system/uploads
+
+  postgres:
+    image: postgres:16-bookworm
+    env_file:
+      - ./.env
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:

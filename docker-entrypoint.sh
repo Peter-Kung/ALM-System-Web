@@ -17,6 +17,8 @@ export DATABASE_URL
 
 mkdir -p "$ALM_DATA_DIR" "$ALM_BACKUP_DIR" "$ALM_UPDATE_STATE_DIR" "$ALM_UPLOADS_DIR"
 
-npx prisma migrate deploy
+if [ "${ALM_SKIP_PRISMA_MIGRATE:-0}" != "1" ]; then
+  npx prisma migrate deploy --schema "${PRISMA_SCHEMA_PATH:-prisma/schema.prisma}"
+fi
 
 exec "$@"
