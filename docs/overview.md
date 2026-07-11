@@ -15,6 +15,22 @@ The dashboard reports from the latest saved snapshot. It does not recalculate
 live market values on page load. This keeps the homepage stable and aligned
 with the same saved history used for snapshot review.
 
+The `Trend summary` card shows continuous daily line data for net worth,
+assets, liabilities, and monthly debt payments. Each trend point represents a
+calendar date. If more than one snapshot exists on the same date, the trend uses
+the latest snapshot from that date. If a date has no snapshot, the trend carries
+forward the previous known snapshot values, so the line remains flat until the
+next saved snapshot.
+
+The trend date controls set the first date in the visible trend window. The
+selected date can be any available trend date from the loaded history through
+the latest snapshot date. The dashboard loads up to 370 calendar days of trend
+history ending at the latest snapshot date. Dates outside the available trend
+range are unavailable. The visible window shows up to 10 consecutive dates from
+the selected date and stops at the latest snapshot date. Selecting a trend date
+changes only the `Trend summary` card; the rest of the dashboard remains based
+on the latest saved snapshot.
+
 The dashboard can show amount values in compact `K` notation or full numeric
 notation. Compact display is the default Dashboard presentation preference.
 This preference does not change saved snapshot values.
