@@ -19,10 +19,16 @@ const deployment: DeploymentState = {
 
 test("account settings page hides deployment controls without administrator state", () => {
   const markup = renderToStaticMarkup(
-    <AccountSettingsPageContent accountForm={<div>Account form</div>} deployment={null} />,
+    <AccountSettingsPageContent
+      accountForm={<div>Account form</div>}
+      deployment={null}
+      profile={{ displayName: "Family Owner", username: "owner" }}
+    />,
   );
 
   assert.match(markup, /Account settings/);
+  assert.match(markup, /Family Owner/);
+  assert.match(markup, /owner/);
   assert.doesNotMatch(markup, /Version and updates/);
   assert.doesNotMatch(markup, /Start rollback/);
 });
@@ -33,6 +39,7 @@ test("account settings page renders deployment controls for administrators", () 
       accountForm={<div>Account form</div>}
       deployment={deployment}
       deploymentPanel={<div>Version and updates Start rollback</div>}
+      profile={{ displayName: null, username: "owner" }}
     />,
   );
 

@@ -17,14 +17,12 @@ import {
 } from "@/modules/auth/action-token";
 
 const PASSWORD_SALT_ROUNDS = 12;
-const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
-
 export type UpdateAccountCredentialsInput = {
   confirmNewPassword?: string;
-  currentPassword: string;
+  currentPassword?: string;
+  displayName?: string | null;
   newPassword?: string;
   userId: string;
-  username?: string;
 };
 
 export type CreateFirstAdministratorInput = {
@@ -33,7 +31,9 @@ export type CreateFirstAdministratorInput = {
   username: string;
 };
 
-export type AuthenticatedUserSession = SessionPayload;
+export type AuthenticatedUserSession = SessionPayload & {
+  displayName: string | null;
+};
 
 export type SelfManagedPasswordTokenType = Extract<
   UserActionTokenType,
@@ -154,10 +154,29 @@ function normalizeUsername(username: string) {
 }
 
 function validateNextUsername(username: string) {
-  if (username.length < 3 || username.length > 32 || !USERNAME_PATTERN.test(username)) {
+  if (username.length < 3 || username.length > 32 || !/^[A-Za-z0-9._-]+$/.test(username)) {
     throw new RepositoryValidationError(
       "Username must be 3 to 32 characters and use only letters, numbers, '.', '_', and '-'.",
     );
+  }
+}
+
+function normalizeDisplayName(displayName: string | null | undefined) {
+  if (displayName === undefined) {
+    return undefined;
+  }
+
+  if (displayName === null) {
+    return null;
+  }
+
+  const normalizedDisplayName = displayName.trim();
+  return normalizedDisplayName ? normalizedDisplayName : null;
+}
+
+function validateDisplayName(displayName: string | null | undefined) {
+  if (displayName && displayName.length > 64) {
+    throw new RepositoryValidationError("Display name must be 64 characters or fewer.");
   }
 }
 
@@ -244,6 +263,7 @@ export async function validateSessionPayload(
 
   return {
     sub: user.id,
+    displayName: user.displayName,
     username: user.username,
     role: user.role,
     sessionVersion: user.sessionVersion,
@@ -377,51 +397,40 @@ export async function updateAccountCredentials(
   repository: AuthRepository = createAuthRepository(),
 ) {
   const currentUser = await requireCurrentUser(repository, input.userId);
-  const verifiedUser = await verifyCurrentPassword(
-    repository,
-    currentUser,
-    input.currentPassword,
-  );
-
-  const nextUsername = input.username ? normalizeUsername(input.username) : undefined;
-  const hasUsernameUpdate = Boolean(
-    nextUsername && nextUsername !== verifiedUser.username,
-  );
+  const nextDisplayName = normalizeDisplayName(input.displayName);
+  const hasDisplayNameUpdate =
+    input.displayName !== undefined && nextDisplayName !== currentUser.displayName;
   const hasPasswordUpdate = Boolean(input.newPassword || input.confirmNewPassword);
-
-  if (nextUsername) {
-    validateNextUsername(nextUsername);
-  }
-
+  validateDisplayName(nextDisplayName);
   validateNextPassword(input.newPassword, input.confirmNewPassword);
 
-  if (!hasUsernameUpdate && !hasPasswordUpdate) {
-    throw new RepositoryValidationError("Provide a new username or password.");
+  if (!hasDisplayNameUpdate && !hasPasswordUpdate) {
+    throw new RepositoryValidationError("Provide a display name or password update.");
   }
 
-  if (hasUsernameUpdate && nextUsername) {
-    const existingUser = await repository.findByUsername(nextUsername);
-    if (existingUser && existingUser.id !== verifiedUser.id) {
-      throw new RepositoryValidationError("That username is already in use.");
+  let verifiedUser = currentUser;
+  if (hasPasswordUpdate) {
+    if (!input.currentPassword?.trim()) {
+      throw new RepositoryValidationError(
+        "Current password is required to change the password.",
+      );
     }
+    verifiedUser = await verifyCurrentPassword(
+      repository,
+      currentUser,
+      input.currentPassword,
+    );
   }
 
   try {
     return await repository.update(verifiedUser.id, {
-      username: hasUsernameUpdate ? nextUsername : undefined,
+      displayName: hasDisplayNameUpdate ? nextDisplayName : undefined,
       passwordHash: input.newPassword
         ? await hashPassword(input.newPassword)
         : undefined,
       sessionVersion: input.newPassword ? { increment: 1 } : undefined,
     });
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      throw new RepositoryValidationError("That username is already in use.");
-    }
-
     throw error;
   }
 }

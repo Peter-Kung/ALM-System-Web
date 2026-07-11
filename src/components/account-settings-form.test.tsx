@@ -72,25 +72,30 @@ async function unmount(root: Root) {
 test("account settings fields expose the credential update contract", () => {
   const markup = renderToStaticMarkup(
     <form className="card account-settings-card stack">
-      <AccountSettingsFormFields pending={false} error="Current password is required." />
+      <AccountSettingsFormFields
+        currentDisplayName="Family Owner"
+        currentUsername="owner"
+        pending={false}
+        error="Current password is required."
+      />
     </form>,
   );
 
-  assert.match(markup, /Owner credentials/);
-  assert.match(markup, /<h2>Account sign-in<\/h2>/);
-  assert.match(markup, /name="username"/);
-  assert.match(markup, /autoComplete="username"/);
-  assert.match(markup, /minLength="3"/);
-  assert.match(markup, /maxLength="32"/);
+  assert.match(markup, /Profile and sign-in/);
+  assert.match(markup, /<h2>Account settings<\/h2>/);
+  assert.match(markup, /name="displayName"/);
+  assert.match(markup, /autoComplete="nickname"/);
+  assert.match(markup, /value="Family Owner"/);
+  assert.match(markup, /Username/);
+  assert.match(markup, />owner</);
   assert.match(markup, /name="currentPassword"/);
   assert.match(markup, /autoComplete="current-password"/);
-  assert.match(markup, /required=""/);
   assert.match(markup, /name="newPassword"/);
   assert.match(markup, /name="confirmNewPassword"/);
   assert.match(markup, /minLength="8"/);
   assert.match(markup, /Current password is required\./);
   assert.match(markup, /role="alert"/);
-  assert.match(markup, /<button type="submit">Save account<\/button>/);
+  assert.match(markup, /<button type="submit">Save settings<\/button>/);
 });
 
 test("account settings form submits credential changes and redirects to login", async () => {
@@ -104,6 +109,8 @@ test("account settings form submits credential changes and redirects to login", 
       root.render(
         <WorkspaceMutationBoundary>
           <AccountSettingsFormWithDependencies
+            currentDisplayName={null}
+            currentUsername="owner"
             router={{
               replace(path) {
                 replacedPaths.push(path);
@@ -115,7 +122,7 @@ test("account settings form submits credential changes and redirects to login", 
             fetcher={async (input, init) => {
               fetchRequests.push({ input: String(input), init });
 
-              return new Response(JSON.stringify({ ok: true }), {
+              return new Response(JSON.stringify({ ok: true, signedOut: true }), {
                 status: 200,
                 headers: { "content-type": "application/json" },
               });
@@ -126,7 +133,7 @@ test("account settings form submits credential changes and redirects to login", 
     });
 
     const form = document.querySelector("form");
-    const username = document.querySelector<HTMLInputElement>('input[name="username"]');
+    const displayName = document.querySelector<HTMLInputElement>('input[name="displayName"]');
     const currentPassword = document.querySelector<HTMLInputElement>(
       'input[name="currentPassword"]',
     );
@@ -136,12 +143,12 @@ test("account settings form submits credential changes and redirects to login", 
     );
 
     assert.ok(form);
-    assert.ok(username);
+    assert.ok(displayName);
     assert.ok(currentPassword);
     assert.ok(newPassword);
     assert.ok(confirmNewPassword);
 
-    username.value = "owner_2";
+    displayName.value = "Family Owner";
     currentPassword.value = "old-password";
     newPassword.value = "new-password";
     confirmNewPassword.value = "new-password";
@@ -155,7 +162,7 @@ test("account settings form submits credential changes and redirects to login", 
     assert.equal(fetchRequests[0].input, "/api/app/account");
     assert.equal(fetchRequests[0].init?.method, "PATCH");
     assert.deepEqual(JSON.parse(String(fetchRequests[0].init?.body)), {
-      username: "owner_2",
+      displayName: "Family Owner",
       currentPassword: "old-password",
       newPassword: "new-password",
       confirmNewPassword: "new-password",
@@ -177,6 +184,8 @@ test("account settings form keeps validation errors visible", async () => {
       root.render(
         <WorkspaceMutationBoundary>
           <AccountSettingsFormWithDependencies
+            currentDisplayName={null}
+            currentUsername="owner"
             router={{
               replace(path) {
                 replacedPaths.push(path);
@@ -229,6 +238,8 @@ test("account settings form reports request failures without redirecting", async
       root.render(
         <WorkspaceMutationBoundary>
           <AccountSettingsFormWithDependencies
+            currentDisplayName={null}
+            currentUsername="owner"
             router={{
               replace(path) {
                 replacedPaths.push(path);
@@ -260,9 +271,62 @@ test("account settings form reports request failures without redirecting", async
       await Promise.resolve();
     });
 
-    assert.match(document.body.textContent ?? "", /Unable to update account credentials\./);
+    assert.match(document.body.textContent ?? "", /Unable to update account settings\./);
     assert.ok(document.querySelector('[role="alert"]'));
     assert.deepEqual(replacedPaths, []);
+  } finally {
+    await unmount(root);
+    restore();
+  }
+});
+
+test("account settings form keeps the session for display-name-only updates", async () => {
+  const { document, root, restore } = createDom();
+  const replacedPaths: string[] = [];
+  let refreshCount = 0;
+
+  try {
+    await act(async () => {
+      root.render(
+        <WorkspaceMutationBoundary>
+          <AccountSettingsFormWithDependencies
+            currentDisplayName="Owner"
+            currentUsername="owner"
+            router={{
+              replace(path) {
+                replacedPaths.push(path);
+              },
+              refresh() {
+                refreshCount += 1;
+              },
+            }}
+            fetcher={async () =>
+              new Response(JSON.stringify({ ok: true, signedOut: false }), {
+                status: 200,
+                headers: { "content-type": "application/json" },
+              })
+            }
+          />
+        </WorkspaceMutationBoundary>,
+      );
+    });
+
+    const form = document.querySelector("form");
+    const displayName = document.querySelector<HTMLInputElement>('input[name="displayName"]');
+
+    assert.ok(form);
+    assert.ok(displayName);
+
+    displayName.value = "Family Owner";
+
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+    });
+
+    assert.match(document.body.textContent ?? "", /Profile updated\./);
+    assert.deepEqual(replacedPaths, []);
+    assert.equal(refreshCount, 1);
   } finally {
     await unmount(root);
     restore();

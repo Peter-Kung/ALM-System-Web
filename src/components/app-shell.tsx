@@ -8,16 +8,23 @@ import type { NavigationRole } from "@/lib/navigation";
 
 type AppShellProps = {
   children: ReactNode;
+  displayName?: string | null;
   role: NavigationRole;
   username: string;
   summary: WorkspaceSummary;
 };
 
-export function AppShell({ children, role, username, summary }: AppShellProps) {
+export function AppShell({ children, displayName, role, username, summary }: AppShellProps) {
   const pathname = usePathname();
 
   return (
-    <AppShellFrame pathname={pathname} role={role} username={username} summary={summary}>
+    <AppShellFrame
+      pathname={pathname}
+      role={role}
+      username={username}
+      displayName={displayName}
+      summary={summary}
+    >
       {children}
     </AppShellFrame>
   );

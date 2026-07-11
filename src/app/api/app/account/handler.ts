@@ -37,19 +37,19 @@ export async function patchAccountHandler(
   try {
     const payload = parseAccountUpdatePayload(await request.json().catch(() => null));
 
-    await patchAccountForUser(
+    const result = await patchAccountForUser(
       dependencies.createRepository(),
       {
         userId: session.sub,
         currentPassword: payload.currentPassword,
-        username: payload.username,
+        displayName: payload.displayName,
         newPassword: payload.newPassword,
         confirmNewPassword: payload.confirmNewPassword,
       },
       dependencies.clearSession,
     );
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, signedOut: result.sessionCleared });
   } catch (error) {
     if (error instanceof RepositoryValidationError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -57,7 +57,7 @@ export async function patchAccountHandler(
 
     console.error(error);
     return NextResponse.json(
-      { error: "Unable to update account credentials." },
+      { error: "Unable to update account settings." },
       { status: 500 },
     );
   }

@@ -10,6 +10,7 @@ import { verifyPassword } from "@/modules/auth/service";
 function createAuthUser(overrides: Partial<AuthUser>): AuthUser {
   return {
     id: "user-1",
+    displayName: null,
     username: "owner",
     passwordHash: null,
     role: "ADMIN",

@@ -11,8 +11,15 @@ export async function patchAccountForUser(
   repository: AuthRepository,
   input: UpdateAccountCredentialsInput,
   clearSession: () => Promise<void>,
-): Promise<AuthUser> {
+): Promise<{ sessionCleared: boolean; user: AuthUser }> {
   const user = await updateAccountCredentials(input, repository);
-  await clearSession();
-  return user;
+  const sessionCleared = Boolean(input.newPassword || input.confirmNewPassword);
+  if (sessionCleared) {
+    await clearSession();
+  }
+
+  return {
+    sessionCleared,
+    user,
+  };
 }

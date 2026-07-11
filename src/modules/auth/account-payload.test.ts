@@ -4,56 +4,47 @@ import test from "node:test";
 import { RepositoryValidationError } from "@/lib/repository-utils";
 import { parseAccountUpdatePayload } from "@/modules/auth/account-payload";
 
-test("parseAccountUpdatePayload accepts the supported credential update fields", () => {
+test("parseAccountUpdatePayload accepts supported profile and password fields", () => {
   const payload = parseAccountUpdatePayload({
+    displayName: "Family Member",
     currentPassword: "current-password",
-    username: "owner.next",
     newPassword: "new-password",
     confirmNewPassword: "new-password",
   });
 
   assert.deepEqual(payload, {
+    displayName: "Family Member",
     currentPassword: "current-password",
-    username: "owner.next",
     newPassword: "new-password",
     confirmNewPassword: "new-password",
   });
 });
 
-test("parseAccountUpdatePayload treats blank optional fields as omitted", () => {
+test("parseAccountUpdatePayload preserves blank display names and omits blank password fields", () => {
   const payload = parseAccountUpdatePayload({
-    currentPassword: "current-password",
-    username: "",
+    displayName: "",
+    currentPassword: "",
     newPassword: "",
     confirmNewPassword: "",
   });
 
   assert.deepEqual(payload, {
-    currentPassword: "current-password",
-    username: undefined,
+    displayName: "",
+    currentPassword: undefined,
     newPassword: undefined,
     confirmNewPassword: undefined,
   });
 });
 
-test("parseAccountUpdatePayload requires a non-empty current password", () => {
-  assert.throws(
-    () => parseAccountUpdatePayload({ currentPassword: "" }),
-    (error: unknown) =>
-      error instanceof RepositoryValidationError &&
-      error.message === "Current password is required.",
-  );
-});
-
-test("parseAccountUpdatePayload rejects non-string credential update fields", () => {
+test("parseAccountUpdatePayload rejects non-string account update fields", () => {
   assert.throws(
     () =>
       parseAccountUpdatePayload({
         currentPassword: "current-password",
-        username: ["owner"],
+        displayName: ["owner"],
       }),
     (error: unknown) =>
       error instanceof RepositoryValidationError &&
-      error.message === "username must be a string.",
+      error.message === "displayName must be a string.",
   );
 });

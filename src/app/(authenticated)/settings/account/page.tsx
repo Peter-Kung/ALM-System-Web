@@ -17,5 +17,13 @@ export default async function AccountSettingsPage() {
       ? await getDeploymentState()
       : null;
 
-  return <AccountSettingsPageContent deployment={deployment} />;
+  return (
+    <AccountSettingsPageContent
+      deployment={deployment}
+      profile={{
+        displayName: validSession?.displayName ?? null,
+        username: validSession?.username ?? "",
+      }}
+    />
+  );
 }

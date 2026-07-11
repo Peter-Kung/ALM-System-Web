@@ -8,6 +8,7 @@ import { AppShellFrame } from "@/components/app-shell-frame";
 test("app shell frame renders the summary region, grouped nav, and footer actions", () => {
   const markup = renderToStaticMarkup(
     <AppShellFrame
+      displayName="Family Owner"
       pathname="/manage/accounts"
       role="ADMIN"
       username="owner"
@@ -34,6 +35,8 @@ test("app shell frame renders the summary region, grouped nav, and footer action
   assert.match(markup, /Users/);
   assert.match(markup, /Settings/);
   assert.match(markup, /Sign out/);
+  assert.match(markup, /Signed in as Family Owner/);
+  assert.match(markup, /Username owner/);
   assert.match(markup, /nav-link nav-link-active/);
 });
 

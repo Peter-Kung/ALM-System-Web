@@ -2,9 +2,9 @@ import { RepositoryValidationError } from "@/lib/repository-utils";
 
 export type AccountUpdatePayload = {
   confirmNewPassword?: string;
-  currentPassword: string;
+  currentPassword?: string;
+  displayName?: string | null;
   newPassword?: string;
-  username?: string;
 };
 
 function readOptionalString(
@@ -30,15 +30,19 @@ export function parseAccountUpdatePayload(payload: unknown): AccountUpdatePayloa
   }
 
   const candidate = payload as Record<string, unknown>;
-  const currentPassword = candidate.currentPassword;
-
-  if (typeof currentPassword !== "string" || currentPassword.trim().length === 0) {
-    throw new RepositoryValidationError("Current password is required.");
+  const currentPassword = readOptionalString(candidate, "currentPassword");
+  const displayName = candidate.displayName as string | null | undefined;
+  if (
+    displayName !== undefined &&
+    displayName !== null &&
+    typeof displayName !== "string"
+  ) {
+    throw new RepositoryValidationError("displayName must be a string.");
   }
 
   return {
     currentPassword,
-    username: readOptionalString(candidate, "username"),
+    displayName,
     newPassword: readOptionalString(candidate, "newPassword"),
     confirmNewPassword: readOptionalString(candidate, "confirmNewPassword"),
   };

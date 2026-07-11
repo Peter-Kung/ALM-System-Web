@@ -47,6 +47,7 @@ function createDependencies(role: "ADMIN" | "USER" = "ADMIN") {
         response: null,
         session: {
           sub: "user-1",
+          displayName: null,
           username: "owner",
           role,
           sessionVersion: 0,

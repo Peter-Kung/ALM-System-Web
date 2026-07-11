@@ -43,6 +43,7 @@ function createAssetFixture() {
         response: null,
         session: {
           sub: "user-1",
+          displayName: null,
           username: "owner",
           role: "ADMIN",
           sessionVersion: 0,

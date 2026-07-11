@@ -22,6 +22,7 @@ export type WorkspaceSummary = {
 
 type AppShellFrameProps = {
   children: ReactNode;
+  displayName?: string | null;
   pathname: string;
   role: NavigationRole;
   username: string;
@@ -30,12 +31,14 @@ type AppShellFrameProps = {
 
 export function AppShellFrame({
   children,
+  displayName,
   pathname,
   role,
   username,
   summary,
 }: AppShellFrameProps) {
   const primaryNavigation = getPrimaryNavigationForRole(role);
+  const accountLabel = displayName ?? username;
 
   return (
     <div className="shell">
@@ -47,7 +50,8 @@ export function AppShellFrame({
           <div className="sidebar-header">
             <p className="eyebrow">Private finance workspace</p>
             <h1>ALM System</h1>
-            <p className="muted">Signed in as {username}</p>
+            <p className="muted">Signed in as {accountLabel}</p>
+            {displayName ? <p className="muted">Username {username}</p> : null}
           </div>
         </div>
 

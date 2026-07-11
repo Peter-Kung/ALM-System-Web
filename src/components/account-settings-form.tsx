@@ -14,35 +14,48 @@ type AccountSettingsRouter = {
 type AccountSettingsFetch = typeof fetch;
 
 export function AccountSettingsFormFields({
+  currentDisplayName,
+  currentUsername,
   pending,
   error,
+  statusMessage,
 }: {
+  currentDisplayName: string | null;
+  currentUsername: string;
   pending: boolean;
   error?: string | null;
+  statusMessage?: string | null;
 }) {
   return (
     <>
       <div className="stack">
         <div>
-          <p className="eyebrow">Owner credentials</p>
-          <h2>Account sign-in</h2>
+          <p className="eyebrow">Profile and sign-in</p>
+          <h2>Account settings</h2>
         </div>
         <p className="muted">
-          Change the username, password, or both. Any saved change signs out the
-          current session.
+          Update the display name used around the workspace. Password changes
+          still require re-authentication, but your username stays fixed.
         </p>
       </div>
 
       <label className="field">
-        <span>New username</span>
+        <span>Display name</span>
         <input
-          name="username"
-          autoComplete="username"
-          minLength={3}
-          maxLength={32}
-          pattern="[A-Za-z0-9._-]+"
+          name="displayName"
+          autoComplete="nickname"
+          defaultValue={currentDisplayName ?? ""}
+          maxLength={64}
+          placeholder="Add the name you want shown in the app"
         />
       </label>
+
+      <div className="detail-grid" aria-label="Account identity">
+        <div>
+          <dt>Username</dt>
+          <dd>{currentUsername}</dd>
+        </div>
+      </div>
 
       <label className="field">
         <span>Current password</span>
@@ -50,7 +63,6 @@ export function AccountSettingsFormFields({
           name="currentPassword"
           type="password"
           autoComplete="current-password"
-          required
         />
       </label>
 
@@ -81,28 +93,48 @@ export function AccountSettingsFormFields({
         </p>
       ) : null}
 
+      {statusMessage ? <p className="muted">{statusMessage}</p> : null}
+
       <button type="submit" disabled={pending}>
-        {pending ? "Saving account..." : "Save account"}
+        {pending ? "Saving settings..." : "Save settings"}
       </button>
     </>
   );
 }
 
-export function AccountSettingsForm() {
+export function AccountSettingsForm({
+  currentDisplayName,
+  currentUsername,
+}: {
+  currentDisplayName: string | null;
+  currentUsername: string;
+}) {
   const router = useRouter();
 
-  return <AccountSettingsFormWithDependencies router={router} fetcher={fetch} />;
+  return (
+    <AccountSettingsFormWithDependencies
+      currentDisplayName={currentDisplayName}
+      currentUsername={currentUsername}
+      router={router}
+      fetcher={fetch}
+    />
+  );
 }
 
 export function AccountSettingsFormWithDependencies({
+  currentDisplayName,
+  currentUsername,
   router,
   fetcher,
 }: {
+  currentDisplayName: string | null;
+  currentUsername: string;
   router: AccountSettingsRouter;
   fetcher: AccountSettingsFetch;
 }) {
   const { isPending, runWorkspaceMutation } = useWorkspaceMutation();
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -110,6 +142,7 @@ export function AccountSettingsFormWithDependencies({
 
     await runWorkspaceMutation(async () => {
       setError(null);
+      setStatusMessage(null);
 
       const formData = new FormData(form);
       let response: Response;
@@ -121,14 +154,14 @@ export function AccountSettingsFormWithDependencies({
             "content-type": "application/json",
           },
           body: JSON.stringify({
-            username: formData.get("username"),
+            displayName: formData.get("displayName"),
             currentPassword: formData.get("currentPassword"),
             newPassword: formData.get("newPassword"),
             confirmNewPassword: formData.get("confirmNewPassword"),
           }),
         });
       } catch {
-        setError("Unable to update account credentials.");
+        setError("Unable to update account settings.");
         return;
       }
 
@@ -136,19 +169,50 @@ export function AccountSettingsFormWithDependencies({
         const payload = (await response.json().catch(() => null)) as
           | { error?: string }
           | null;
-        setError(payload?.error ?? "Unable to update account credentials.");
+        setError(payload?.error ?? "Unable to update account settings.");
         return;
       }
 
-      form.reset();
-      router.replace("/login");
+      const payload = (await response.json().catch(() => null)) as
+        | { signedOut?: boolean }
+        | null;
+
+      if (payload?.signedOut) {
+        form.reset();
+        router.replace("/login");
+      } else {
+        const currentPassword = form.elements.namedItem(
+          "currentPassword",
+        ) as HTMLInputElement | null;
+        const newPassword = form.elements.namedItem("newPassword") as HTMLInputElement | null;
+        const confirmNewPassword = form.elements.namedItem(
+          "confirmNewPassword",
+        ) as HTMLInputElement | null;
+        if (currentPassword) {
+          currentPassword.value = "";
+        }
+        if (newPassword) {
+          newPassword.value = "";
+        }
+        if (confirmNewPassword) {
+          confirmNewPassword.value = "";
+        }
+        setStatusMessage("Profile updated.");
+      }
+
       router.refresh();
     });
   }
 
   return (
     <form className="card account-settings-card stack" onSubmit={handleSubmit}>
-      <AccountSettingsFormFields pending={isPending} error={error} />
+      <AccountSettingsFormFields
+        currentDisplayName={currentDisplayName}
+        currentUsername={currentUsername}
+        pending={isPending}
+        error={error}
+        statusMessage={statusMessage}
+      />
     </form>
   );
 }

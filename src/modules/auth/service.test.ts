@@ -26,6 +26,7 @@ import {
 function createAuthUser(overrides: Partial<AuthUser>): AuthUser {
   return {
     id: "user-1",
+    displayName: null,
     username: "owner",
     passwordHash: null,
     role: "ADMIN",
@@ -88,6 +89,10 @@ function createRepositoryFixture(
     async create(data: Prisma.UserCreateInput) {
       const user = createAuthUser({
         id: `user-${users.length + 1}`,
+        displayName:
+          typeof data.displayName === "string" || data.displayName === null
+            ? data.displayName
+            : null,
         username: data.username,
         passwordHash: data.passwordHash ?? null,
         role: data.role ?? ("ADMIN" as const),
@@ -102,6 +107,7 @@ function createRepositoryFixture(
     async createFirstAdministrator(data: { passwordHash: string; username: string }) {
       const user = createAuthUser({
         id: `user-${users.length + 1}`,
+        displayName: null,
         username: data.username,
         passwordHash: data.passwordHash,
         createdAt: new Date(`2026-07-0${users.length + 1}T00:00:00Z`),
@@ -117,6 +123,10 @@ function createRepositoryFixture(
 
       if (typeof data.username === "string") {
         user.username = data.username;
+      }
+
+      if (typeof data.displayName === "string" || data.displayName === null) {
+        user.displayName = data.displayName;
       }
 
       if (typeof data.passwordHash === "string") {
@@ -481,10 +491,11 @@ test("createFirstAdministrator rejects setup after any user exists", async () =>
   );
 });
 
-test("updateAccountCredentials updates the username and password after validating the current password", async () => {
+test("updateAccountCredentials updates the display name and password after validating the current password", async () => {
   const repository = createRepositoryFixture([
     {
       id: "user-1",
+      displayName: "Owner",
       username: "owner",
       passwordHash: await hashPassword("current-password"),
       createdAt: new Date("2026-07-01T00:00:00Z"),
@@ -495,14 +506,15 @@ test("updateAccountCredentials updates the username and password after validatin
     {
       userId: "user-1",
       currentPassword: "current-password",
-      username: " owner.next ",
+      displayName: "  Family Manager  ",
       newPassword: "new-password",
       confirmNewPassword: "new-password",
     },
     repository,
   );
 
-  assert.equal(user.username, "owner.next");
+  assert.equal(user.displayName, "Family Manager");
+  assert.equal(user.username, "owner");
   assert.ok(user.passwordHash);
   assert.equal(await verifyPassword("new-password", user.passwordHash), true);
 });
@@ -566,6 +578,7 @@ test("validateSessionPayload exposes role and rejects inactive or stale sessions
     ),
     {
       sub: "user-1",
+      displayName: null,
       username: "owner",
       role: "USER",
       sessionVersion: 2,
@@ -598,10 +611,11 @@ test("validateSessionPayload exposes role and rejects inactive or stale sessions
   );
 });
 
-test("updateAccountCredentials makes username-only changes require the new username for sign-in", async () => {
+test("updateAccountCredentials updates the display name without changing sign-in username", async () => {
   const repository = createRepositoryFixture([
     {
       id: "user-1",
+      displayName: null,
       username: "owner",
       passwordHash: await hashPassword("current-password"),
       createdAt: new Date("2026-07-01T00:00:00Z"),
@@ -611,15 +625,14 @@ test("updateAccountCredentials makes username-only changes require the new usern
   const user = await updateAccountCredentials(
     {
       userId: "user-1",
-      currentPassword: "current-password",
-      username: "owner.next",
+      displayName: "Family Owner",
     },
     repository,
   );
 
-  assert.equal(user.username, "owner.next");
-  assert.ok(await validateOwnerLogin("owner.next", "current-password", repository));
-  assert.equal(await validateOwnerLogin("owner", "current-password", repository), null);
+  assert.equal(user.displayName, "Family Owner");
+  assert.equal(user.username, "owner");
+  assert.ok(await validateOwnerLogin("owner", "current-password", repository));
 });
 
 test("updateAccountCredentials backfills a legacy owner before saving changes", async () => {
@@ -662,7 +675,8 @@ test("updateAccountCredentials rejects an incorrect current password", async () 
         {
           userId: "user-1",
           currentPassword: "wrong-password",
-          username: "owner.next",
+          newPassword: "new-password",
+          confirmNewPassword: "new-password",
         },
         repository,
       ),
@@ -672,39 +686,7 @@ test("updateAccountCredentials rejects an incorrect current password", async () 
   );
 });
 
-test("updateAccountCredentials rejects duplicate usernames", async () => {
-  const repository = createRepositoryFixture([
-    {
-      id: "user-1",
-      username: "owner",
-      passwordHash: await hashPassword("current-password"),
-      createdAt: new Date("2026-07-01T00:00:00Z"),
-    },
-    {
-      id: "user-2",
-      username: "taken-name",
-      passwordHash: await hashPassword("different-password"),
-      createdAt: new Date("2026-07-02T00:00:00Z"),
-    },
-  ]);
-
-  await assert.rejects(
-    () =>
-      updateAccountCredentials(
-        {
-          userId: "user-1",
-          currentPassword: "current-password",
-          username: "taken-name",
-        },
-        repository,
-      ),
-    (error: unknown) =>
-      error instanceof RepositoryValidationError &&
-      error.message === "That username is already in use.",
-  );
-});
-
-test("updateAccountCredentials rejects invalid username and password updates", async () => {
+test("updateAccountCredentials rejects invalid display-name and password updates", async () => {
   const repository = createRepositoryFixture([
     {
       id: "user-1",
@@ -719,15 +701,14 @@ test("updateAccountCredentials rejects invalid username and password updates", a
       updateAccountCredentials(
         {
           userId: "user-1",
-          currentPassword: "current-password",
-          username: "a",
+          displayName:
+            "This display name is intentionally much longer than sixty four characters to trip validation.",
         },
         repository,
       ),
     (error: unknown) =>
       error instanceof RepositoryValidationError &&
-      error.message ===
-        "Username must be 3 to 32 characters and use only letters, numbers, '.', '_', and '-'.",
+      error.message === "Display name must be 64 characters or fewer.",
   );
 
   await assert.rejects(
@@ -760,6 +741,22 @@ test("updateAccountCredentials rejects invalid username and password updates", a
     (error: unknown) =>
       error instanceof RepositoryValidationError &&
       error.message === "New password and confirmation must match.",
+  );
+
+  await assert.rejects(
+    () =>
+      updateAccountCredentials(
+        {
+          userId: "user-1",
+          displayName: "Family Owner",
+          newPassword: "new-password",
+          confirmNewPassword: "new-password",
+        },
+        repository,
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message === "Current password is required to change the password.",
   );
 });
 

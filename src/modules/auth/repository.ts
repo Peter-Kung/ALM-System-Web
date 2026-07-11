@@ -12,6 +12,7 @@ import type { UserActionTokenRepository } from "@/modules/auth/action-token";
 export type AuthUser = Pick<
   User,
   | "id"
+  | "displayName"
   | "username"
   | "passwordHash"
   | "role"
@@ -36,6 +37,7 @@ export type AuthUserActionToken = Pick<
 
 const authUserSelect = {
   id: true,
+  displayName: true,
   username: true,
   passwordHash: true,
   role: true,

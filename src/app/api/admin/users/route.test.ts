@@ -226,6 +226,7 @@ test("listUsersHandler rejects non-admin sessions", async () => {
         response: null,
         session: {
           sub: "user-1",
+          displayName: null,
           username: "family",
           role: "USER",
           sessionVersion: 0,
@@ -256,6 +257,7 @@ test("createUserHandler rejects admin-set passwords", async () => {
           response: null,
           session: {
             sub: "admin-user",
+            displayName: null,
             username: "admin",
             role: "ADMIN",
             sessionVersion: 0,
@@ -289,6 +291,7 @@ test("createUserHandler creates users for admin sessions", async () => {
           response: null,
           session: {
             sub: "admin-user",
+            displayName: null,
             username: "admin",
             role: "ADMIN",
             sessionVersion: 0,
@@ -321,6 +324,7 @@ test("updateUserHandler rejects admin-set passwords", async () => {
           response: null,
           session: {
             sub: "admin-user",
+            displayName: null,
             username: "admin",
             role: "ADMIN",
             sessionVersion: 0,
@@ -352,6 +356,7 @@ test("updateUserHandler rejects non-admin sessions", async () => {
           response: null,
           session: {
             sub: "family-user",
+            displayName: null,
             username: "family",
             role: "USER",
             sessionVersion: 0,
@@ -388,6 +393,7 @@ test("updateUserHandler updates active status and increments session version", a
           response: null,
           session: {
             sub: "admin-user",
+            displayName: null,
             username: "admin",
             role: "ADMIN",
             sessionVersion: 0,
@@ -411,6 +417,7 @@ test("requestUserActivationHandler rejects non-admin sessions", async () => {
         response: null,
         session: {
           sub: "family-user",
+          displayName: null,
           username: "family",
           role: "USER",
           sessionVersion: 0,
@@ -443,6 +450,7 @@ test("requestUserPasswordResetHandler returns no usable password", async () => {
         response: null,
         session: {
           sub: "admin-user",
+          displayName: null,
           username: "admin",
           role: "ADMIN",
           sessionVersion: 0,
@@ -477,6 +485,7 @@ test("requestUserActivationHandler rejects already active users", async () => {
         response: null,
         session: {
           sub: "admin-user",
+          displayName: null,
           username: "admin",
           role: "ADMIN",
           sessionVersion: 0,
@@ -507,6 +516,7 @@ test("requestUserTelegramBindingCodeHandler returns a short-lived binding code",
         response: null,
         session: {
           sub: "admin-user",
+          displayName: null,
           username: "admin",
           role: "ADMIN",
           sessionVersion: 0,
