@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ReactNode } from "react";
 
 import { AppShell } from "@/components/app-shell";
+import { formatDashboardAmount } from "@/components/dashboard-amount-format";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { isBootstrapRequired } from "@/modules/auth";
@@ -40,7 +41,7 @@ export default async function AuthenticatedLayout({
   );
 }
 
-function buildWorkspaceSummary(summary: DashboardSidebarSummary) {
+export function buildWorkspaceSummary(summary: DashboardSidebarSummary) {
   if (!summary.hasSnapshot || !summary.snapshotAt || !summary.netWorth || !summary.baseCurrency) {
     return {
       latestSnapshotLabel: "No snapshot saved yet",
@@ -57,7 +58,7 @@ function buildWorkspaceSummary(summary: DashboardSidebarSummary) {
 
   return {
     latestSnapshotLabel: `Latest snapshot ${formatSnapshotDateTime(summary.snapshotAt)}`,
-    netWorthLabel: `${summary.netWorth} ${summary.baseCurrency}`,
+    netWorthLabel: formatSnapshotPulseAmount(summary.netWorth, summary.baseCurrency),
     snapshotStatusLabel: summary.status === "COMPLETE" ? "Complete" : "Incomplete",
     metricRows: [
       {
@@ -90,5 +91,9 @@ function formatMetricValue(value: string | null, currency: string) {
     return `0.00 ${currency}`;
   }
 
-  return `${value} ${currency}`;
+  return formatSnapshotPulseAmount(value, currency);
+}
+
+function formatSnapshotPulseAmount(value: string, currency: string) {
+  return formatDashboardAmount(value, currency, "compact");
 }
