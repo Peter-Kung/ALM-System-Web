@@ -53,10 +53,8 @@ test("login page keeps the sign-in panel centered in the viewport layout", () =>
   assert.match(loginLayoutRule, /grid-template-areas:\s*"panel";/);
   assert.match(loginLayoutRule, /justify-items:\s*center;/);
 
-  assert.match(
-    cssRule(".login-layout::after,\n.login-hero"),
-    /display:\s*none;/,
-  );
+  assert.equal(globalsCss.includes(".login-hero"), false);
+  assert.equal(globalsCss.includes(".login-layout::after"), false);
 });
 
 test("login page uses a single centered form layout on mobile", () => {
@@ -71,9 +69,4 @@ test("login page uses a single centered form layout on mobile", () => {
   assert.ok(mobileLoginPageRule, "Expected mobile login page centering rule");
   assert.match(mobileLoginPageRule, /place-items:\s*center;/);
   assert.match(mobileLoginPageRule, /align-content:\s*center;/);
-
-  assert.match(
-    cssRule(".login-layout::after,\n  .login-hero", mobileCss),
-    /display:\s*none;/,
-  );
 });

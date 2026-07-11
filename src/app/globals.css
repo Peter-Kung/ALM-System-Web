@@ -125,60 +125,12 @@ button:disabled {
   align-items: center;
 }
 
-.login-layout::after,
-.login-hero {
-  content: "";
-  display: none;
-}
-
-.login-hero,
 .login-panel {
   min-width: 0;
 }
 
-.login-hero {
-  grid-area: hero;
-  position: relative;
-  overflow: hidden;
-  padding: 2.2rem;
-  border-radius: 32px;
-  border: 1px solid rgba(67, 82, 52, 0.14);
-  background:
-    radial-gradient(circle at top left, rgba(199, 157, 92, 0.18), transparent 26%),
-    radial-gradient(circle at 82% 18%, rgba(125, 143, 90, 0.2), transparent 24%),
-    linear-gradient(180deg, rgba(255, 252, 246, 0.92), rgba(246, 238, 225, 0.88));
-  box-shadow: var(--shadow);
-}
-
-.login-brand {
-  gap: 1.25rem;
-}
-
-.login-brand-mark {
-  width: 3.6rem;
-  height: 3.6rem;
-}
-
-.login-hero h2,
-.login-card h1,
-.login-highlight-card h2 {
+.login-card h1 {
   margin: 0;
-}
-
-.login-hero .muted,
-.login-highlight-card .muted {
-  max-width: 36rem;
-}
-
-.login-highlight-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 1fr;
-  margin-top: auto;
-}
-
-.login-highlight-card {
-  min-height: 100%;
 }
 
 .login-panel {
@@ -905,11 +857,6 @@ button:disabled {
     align-content: center;
   }
 
-  .login-layout::after,
-  .login-hero {
-    display: none;
-  }
-
   .sidebar {
     padding: 1.15rem;
   }
@@ -919,12 +866,7 @@ button:disabled {
     top: auto;
   }
 
-  .login-hero,
   .login-card {
     padding: 1.4rem;
-  }
-
-  .login-highlight-grid {
-    grid-template-columns: 1fr;
   }
 }

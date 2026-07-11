@@ -7,7 +7,7 @@ import { LoginFormFields } from "@/components/login-form";
 import { LoginPageFrame } from "@/components/login-page-frame";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 
-test("login page frame renders branded regions and preserves the sign-in form contract", () => {
+test("login page frame renders only the centered auth panel", () => {
   const markup = renderToStaticMarkup(
     <LoginPageFrame>
       <form className="login-card stack">
@@ -16,9 +16,10 @@ test("login page frame renders branded regions and preserves the sign-in form co
     </LoginPageFrame>,
   );
 
-  assert.match(markup, /Private balance sheet workspace/);
-  assert.match(markup, /Track the shape of your money with a calmer daily cockpit\./);
   assert.match(markup, /Owner sign in panel/);
+  assert.doesNotMatch(markup, /login-hero/);
+  assert.doesNotMatch(markup, /Private balance sheet workspace/);
+  assert.doesNotMatch(markup, /Snapshot pulse/);
   assert.match(markup, /name="next"/);
   assert.match(markup, /value="\/dashboard"/);
   assert.match(markup, /name="username"/);
