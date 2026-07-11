@@ -123,7 +123,12 @@ test("dashboard route renders the dedicated reminders area after authenticated s
   const requestedUserIds: string[] = [];
   const requestedSelectedDates: Array<string | null | undefined> = [];
   const DashboardPage = createDashboardPage({
-    getSession: async () => ({ sub: "user-1", username: "owner" }),
+    getSession: async () => ({
+      sub: "user-1",
+      username: "owner",
+      role: "ADMIN",
+      sessionVersion: 0,
+    }),
     createDashboardSummary: async (userId, options) => {
       requestedUserIds.push(userId);
       requestedSelectedDates.push(options.selectedDate);

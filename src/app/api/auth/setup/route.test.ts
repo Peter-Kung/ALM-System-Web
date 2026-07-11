@@ -7,8 +7,24 @@ import { setupHandler } from "@/app/api/auth/setup/handler";
 import type { AuthRepository, AuthUser } from "@/modules/auth/repository";
 import { verifyPassword } from "@/modules/auth/service";
 
-function createRepositoryFixture(initialUsers: AuthUser[] = []) {
-  const users = [...initialUsers];
+function createAuthUser(overrides: Partial<AuthUser>): AuthUser {
+  return {
+    id: "user-1",
+    username: "owner",
+    passwordHash: null,
+    role: "ADMIN",
+    isActive: true,
+    sessionVersion: 0,
+    lastLoginAt: null,
+    createdAt: new Date("2026-07-01T00:00:00Z"),
+    ...overrides,
+  };
+}
+
+function createRepositoryFixture(initialUsers: Partial<AuthUser>[] = []) {
+  const users = initialUsers.map((user, index) =>
+    createAuthUser({ id: `user-${index + 1}`, ...user }),
+  );
   const repository: AuthRepository = {
     async findById(id) {
       return users.find((user) => user.id === id) ?? null;
@@ -23,22 +39,20 @@ function createRepositoryFixture(initialUsers: AuthUser[] = []) {
       return users.find((user) => user.passwordHash) ?? null;
     },
     async create(data) {
-      const user = {
+      const user = createAuthUser({
         id: `user-${users.length + 1}`,
         username: data.username,
         passwordHash: data.passwordHash ?? null,
-        createdAt: new Date("2026-07-01T00:00:00Z"),
-      };
+      });
       users.push(user);
       return user;
     },
     async createFirstAdministrator(data) {
-      const user = {
+      const user = createAuthUser({
         id: `user-${users.length + 1}`,
         username: data.username,
         passwordHash: data.passwordHash,
-        createdAt: new Date("2026-07-01T00:00:00Z"),
-      };
+      });
       users.push(user);
       return user;
     },
@@ -70,7 +84,7 @@ test("setupHandler creates the first administrator and signs in", async () => {
     }),
     {
       async createSessionToken(payload) {
-        return `token:${payload.sub}:${payload.username}`;
+        return `token:${payload.sub}:${payload.username}:${payload.role}:${payload.sessionVersion}`;
       },
       createRepository() {
         return repository;

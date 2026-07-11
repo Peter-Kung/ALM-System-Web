@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { formatDashboardAmount } from "@/components/dashboard-amount-format";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { getSessionFromCookies } from "@/lib/auth/session";
-import { isBootstrapRequired } from "@/modules/auth";
+import { isBootstrapRequired, validateSessionPayload } from "@/modules/auth";
 import { createAuthRepository } from "@/modules/auth/repository";
 import { createDashboardSummaryForUser } from "@/modules/dashboard";
 import type { DashboardSidebarSummary } from "@/modules/dashboard/service";
@@ -25,15 +25,15 @@ export default async function AuthenticatedLayout({
     redirect("/login");
   }
 
-  const user = await repository.findById(session.sub);
-  if (!user) {
+  const validSession = await validateSessionPayload(session, repository);
+  if (!validSession) {
     redirect("/login");
   }
 
-  const dashboard = await createDashboardSummaryForUser(user.id);
+  const dashboard = await createDashboardSummaryForUser(validSession.sub);
   return (
     <AppShell
-      username={user.username}
+      username={validSession.username}
       summary={buildWorkspaceSummary(dashboard.sidebarSummary)}
     >
       <WorkspaceMutationBoundary>{children}</WorkspaceMutationBoundary>

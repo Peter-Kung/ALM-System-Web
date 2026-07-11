@@ -26,6 +26,23 @@ export const env = {
   databaseUrl: process.env.DATABASE_URL ?? defaultDatabaseUrl,
 };
 
+export function getConfiguredAdminCredentials() {
+  const username = process.env.APP_ADMIN_USERNAME?.trim();
+  const password = process.env.APP_ADMIN_PASSWORD;
+
+  if (!username && !password) {
+    return null;
+  }
+
+  if (!username || !password) {
+    throw new Error(
+      "APP_ADMIN_USERNAME and APP_ADMIN_PASSWORD must be configured together.",
+    );
+  }
+
+  return { username, password };
+}
+
 function requireConfiguredValue(value: string | null, envName: string) {
   if (!value) {
     throw new Error(`${envName} must be set outside local development.`);

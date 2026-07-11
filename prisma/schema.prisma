@@ -69,18 +69,26 @@ enum SnapshotEntityType {
   SYSTEM
 }
 
+enum UserRole {
+  ADMIN
+  USER
+}
+
 model User {
-  id          String      @id @default(cuid())
-  username    String      @unique
-  passwordHash String?
-  role        String      @default("ADMIN")
-  bootstrapKey String?     @unique
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  accounts    Account[]
-  assets      Asset[]
-  liabilities Liability[]
-  snapshots   Snapshot[]
+  id             String      @id @default(cuid())
+  username       String      @unique
+  passwordHash   String?
+  role           UserRole    @default(ADMIN)
+  isActive       Boolean     @default(true)
+  sessionVersion Int         @default(0)
+  lastLoginAt    DateTime?
+  bootstrapKey   String?     @unique
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  accounts       Account[]
+  assets         Asset[]
+  liabilities    Liability[]
+  snapshots      Snapshot[]
 }
 
 model Account {

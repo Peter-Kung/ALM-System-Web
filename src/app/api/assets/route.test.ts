@@ -39,7 +39,15 @@ function createAssetFixture() {
 
   const dependencies: AssetRouteHandlerDependencies = {
     async requireSession() {
-      return { response: null, session: { sub: "user-1", username: "owner" } };
+      return {
+        response: null,
+        session: {
+          sub: "user-1",
+          username: "owner",
+          role: "ADMIN",
+          sessionVersion: 0,
+        },
+      };
     },
     createRepository() {
       return {

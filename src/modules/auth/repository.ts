@@ -3,41 +3,47 @@ import type { Prisma, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { PrismaExecutor } from "@/lib/prisma-executor";
 
-export type AuthUser = Pick<User, "id" | "username" | "passwordHash" | "createdAt">;
+export type AuthUser = Pick<
+  User,
+  | "id"
+  | "username"
+  | "passwordHash"
+  | "role"
+  | "isActive"
+  | "sessionVersion"
+  | "lastLoginAt"
+  | "createdAt"
+>;
+
+const authUserSelect = {
+  id: true,
+  username: true,
+  passwordHash: true,
+  role: true,
+  isActive: true,
+  sessionVersion: true,
+  lastLoginAt: true,
+  createdAt: true,
+} satisfies Prisma.UserSelect;
 
 export function createAuthRepository(db: PrismaExecutor = prisma) {
   return {
     findById(id: string): Promise<AuthUser | null> {
       return db.user.findUnique({
         where: { id },
-        select: {
-          id: true,
-          username: true,
-          passwordHash: true,
-          createdAt: true,
-        },
+        select: authUserSelect,
       });
     },
     findByUsername(username: string): Promise<AuthUser | null> {
       return db.user.findUnique({
         where: { username },
-        select: {
-          id: true,
-          username: true,
-          passwordHash: true,
-          createdAt: true,
-        },
+        select: authUserSelect,
       });
     },
     findFirstUser(): Promise<AuthUser | null> {
       return db.user.findFirst({
         orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          username: true,
-          passwordHash: true,
-          createdAt: true,
-        },
+        select: authUserSelect,
       });
     },
     findFirstUserWithPasswordHash(): Promise<AuthUser | null> {
@@ -48,23 +54,13 @@ export function createAuthRepository(db: PrismaExecutor = prisma) {
           },
         },
         orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          username: true,
-          passwordHash: true,
-          createdAt: true,
-        },
+        select: authUserSelect,
       });
     },
     create(data: Prisma.UserCreateInput): Promise<AuthUser> {
       return db.user.create({
         data,
-        select: {
-          id: true,
-          username: true,
-          passwordHash: true,
-          createdAt: true,
-        },
+        select: authUserSelect,
       });
     },
     async createFirstAdministrator(data: {
@@ -78,24 +74,14 @@ export function createAuthRepository(db: PrismaExecutor = prisma) {
           role: "ADMIN",
           bootstrapKey: "single-user",
         },
-        select: {
-          id: true,
-          username: true,
-          passwordHash: true,
-          createdAt: true,
-        },
+        select: authUserSelect,
       });
     },
     update(id: string, data: Prisma.UserUncheckedUpdateInput): Promise<AuthUser> {
       return db.user.update({
         where: { id },
         data,
-        select: {
-          id: true,
-          username: true,
-          passwordHash: true,
-          createdAt: true,
-        },
+        select: authUserSelect,
       });
     },
   };

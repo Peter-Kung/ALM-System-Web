@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSessionFromCookies } from "@/lib/auth/session";
 import { createAuthRepository } from "@/modules/auth/repository";
-import { isBootstrapRequired } from "@/modules/auth/service";
+import { isBootstrapRequired, validateSessionPayload } from "@/modules/auth/service";
 
 export async function requireApiSession() {
   const repository = createAuthRepository();
@@ -22,13 +22,13 @@ export async function requireApiSession() {
     };
   }
 
-  const user = await repository.findById(session.sub);
-  if (!user) {
+  const validSession = await validateSessionPayload(session, repository);
+  if (!validSession) {
     return {
       response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       session: null,
     };
   }
 
-  return { response: null, session };
+  return { response: null, session: validSession };
 }

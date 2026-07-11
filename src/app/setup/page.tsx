@@ -4,13 +4,16 @@ import { LoginPageFrame } from "@/components/login-page-frame";
 import { SetupForm } from "@/components/setup-form";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { getSessionFromCookies } from "@/lib/auth/session";
-import { isBootstrapRequired } from "@/modules/auth";
+import { isBootstrapRequired, validateSessionPayload } from "@/modules/auth";
+import { createAuthRepository } from "@/modules/auth/repository";
 
 export default async function SetupPage() {
+  const repository = createAuthRepository();
   const session = await getSessionFromCookies();
-  const bootstrapRequired = await isBootstrapRequired();
+  const bootstrapRequired = await isBootstrapRequired(repository);
   if (!bootstrapRequired) {
-    if (session) {
+    const validSession = await validateSessionPayload(session, repository);
+    if (validSession) {
       redirect("/dashboard");
     }
 

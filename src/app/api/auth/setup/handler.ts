@@ -7,7 +7,12 @@ import { createFirstAdministrator } from "@/modules/auth";
 import { createAuthRepository, type AuthRepository } from "@/modules/auth/repository";
 
 type SetupDependencies = {
-  createSessionToken(payload: { sub: string; username: string }): Promise<string>;
+  createSessionToken(payload: {
+    role: "ADMIN" | "USER";
+    sessionVersion: number;
+    sub: string;
+    username: string;
+  }): Promise<string>;
   createRepository(): AuthRepository;
   setSession(token: string): Promise<void>;
 };
@@ -76,6 +81,8 @@ export async function setupHandler(
     );
 
     const token = await dependencies.createSessionToken({
+      role: user.role,
+      sessionVersion: user.sessionVersion,
       sub: user.id,
       username: user.username,
     });

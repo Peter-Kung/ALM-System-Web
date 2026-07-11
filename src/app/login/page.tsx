@@ -5,15 +5,17 @@ import { LoginForm } from "@/components/login-form";
 import { LoginPageFrame } from "@/components/login-page-frame";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { getSessionFromCookies } from "@/lib/auth/session";
-import { isBootstrapRequired } from "@/modules/auth";
+import { isBootstrapRequired, validateSessionPayload } from "@/modules/auth";
+import { createAuthRepository } from "@/modules/auth/repository";
 
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams?: Promise<{ next?: string }>;
 }) {
+  const repository = createAuthRepository();
   const session = await getSessionFromCookies();
-  const bootstrapRequired = await isBootstrapRequired();
+  const bootstrapRequired = await isBootstrapRequired(repository);
   if (bootstrapRequired) {
     redirect("/setup");
   }
@@ -26,7 +28,8 @@ export default async function LoginPage({
       ? resolvedSearchParams.next
       : "/dashboard";
 
-  if (session) {
+  const validSession = await validateSessionPayload(session, repository);
+  if (validSession) {
     redirect(nextPath as Route);
   }
 

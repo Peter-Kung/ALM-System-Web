@@ -6,6 +6,8 @@ export const SESSION_COOKIE = "alm_session";
 const encoder = new TextEncoder();
 
 export type SessionPayload = {
+  role: "ADMIN" | "USER";
+  sessionVersion: number;
   sub: string;
   username: string;
 };
@@ -15,7 +17,11 @@ function getSecret() {
 }
 
 export async function createSessionToken(payload: SessionPayload) {
-  return new SignJWT({ username: payload.username })
+  return new SignJWT({
+    role: payload.role,
+    sessionVersion: payload.sessionVersion,
+    username: payload.username,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
@@ -30,12 +36,21 @@ export async function readSessionToken(token?: string | null) {
 
   try {
     const verified = await jwtVerify(token, getSecret());
+    const role = verified.payload.role;
+    const sessionVersion = verified.payload.sessionVersion;
     const username = verified.payload.username;
-    if (typeof verified.payload.sub !== "string" || typeof username !== "string") {
+    if (
+      typeof verified.payload.sub !== "string" ||
+      (role !== "ADMIN" && role !== "USER") ||
+      typeof sessionVersion !== "number" ||
+      typeof username !== "string"
+    ) {
       return null;
     }
 
     return {
+      role,
+      sessionVersion,
       sub: verified.payload.sub,
       username,
     } satisfies SessionPayload;

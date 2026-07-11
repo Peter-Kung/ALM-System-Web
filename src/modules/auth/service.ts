@@ -1,7 +1,8 @@
 import bcrypt from "bcrypt";
 import { Prisma } from "@prisma/client";
 
-import { env, requireFixedPassword } from "@/lib/env";
+import { env, getConfiguredAdminCredentials, requireFixedPassword } from "@/lib/env";
+import type { SessionPayload } from "@/lib/auth/token";
 import { RepositoryValidationError } from "@/lib/repository-utils";
 import {
   createAuthRepository,
@@ -26,6 +27,8 @@ export type CreateFirstAdministratorInput = {
   username: string;
 };
 
+export type AuthenticatedUserSession = SessionPayload;
+
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
 }
@@ -43,7 +46,41 @@ async function backfillLegacyOwner(
   return repository.update(user.id, {
     username: env.fixedUsername,
     passwordHash,
+    role: "ADMIN",
+    isActive: true,
   });
+}
+
+export async function ensureConfiguredAdministrator(
+  repository: AuthRepository = createAuthRepository(),
+) {
+  const configuredAdmin = getConfiguredAdminCredentials();
+  if (!configuredAdmin) {
+    return null;
+  }
+
+  const firstUser = await repository.findFirstUser();
+  if (!firstUser) {
+    return repository.createFirstAdministrator({
+      username: configuredAdmin.username,
+      passwordHash: await hashPassword(configuredAdmin.password),
+    });
+  }
+
+  if (
+    !firstUser.passwordHash &&
+    (firstUser.username === env.fixedUsername ||
+      firstUser.username === configuredAdmin.username)
+  ) {
+    return repository.update(firstUser.id, {
+      username: configuredAdmin.username,
+      passwordHash: await hashPassword(configuredAdmin.password),
+      role: "ADMIN",
+      isActive: true,
+    });
+  }
+
+  return firstUser;
 }
 
 export async function validateOwnerLogin(
@@ -51,6 +88,7 @@ export async function validateOwnerLogin(
   password: string,
   repository: AuthRepository = createAuthRepository(),
 ) {
+  await ensureConfiguredAdministrator(repository);
   const trimmedUsername = username.trim();
   const user = await repository.findByUsername(trimmedUsername);
 
@@ -65,12 +103,16 @@ export async function validateOwnerLogin(
     }
   }
 
-  if (!user?.passwordHash) {
+  if (!user?.passwordHash || !user.isActive) {
     return null;
   }
 
   const isValid = await verifyPassword(password, user.passwordHash);
-  return isValid ? user : null;
+  if (!isValid) {
+    return null;
+  }
+
+  return repository.update(user.id, { lastLoginAt: new Date() });
 }
 
 function normalizeUsername(username: string) {
@@ -111,6 +153,7 @@ function validateNextPassword(
 export async function isBootstrapRequired(
   repository: AuthRepository = createAuthRepository(),
 ) {
+  await ensureConfiguredAdministrator(repository);
   return (await repository.findFirstUser()) === null;
 }
 
@@ -142,6 +185,27 @@ export async function createFirstAdministrator(
 
     throw error;
   }
+}
+
+export async function validateSessionPayload(
+  session: SessionPayload | null,
+  repository: AuthRepository = createAuthRepository(),
+) {
+  if (!session) {
+    return null;
+  }
+
+  const user = await repository.findById(session.sub);
+  if (!user?.isActive || user.sessionVersion !== session.sessionVersion) {
+    return null;
+  }
+
+  return {
+    sub: user.id,
+    username: user.username,
+    role: user.role,
+    sessionVersion: user.sessionVersion,
+  } satisfies AuthenticatedUserSession;
 }
 
 async function requireCurrentUser(
@@ -224,6 +288,7 @@ export async function updateAccountCredentials(
       passwordHash: input.newPassword
         ? await hashPassword(input.newPassword)
         : undefined,
+      sessionVersion: input.newPassword ? { increment: 1 } : undefined,
     });
   } catch (error) {
     if (

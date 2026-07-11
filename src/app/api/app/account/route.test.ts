@@ -6,20 +6,31 @@ import { NextRequest } from "next/server";
 import { patchAccountHandler } from "@/app/api/app/account/handler";
 import { RepositoryValidationError } from "@/lib/repository-utils";
 import { patchAccountForUser } from "@/modules/auth";
-import type { AuthRepository } from "@/modules/auth/repository";
+import type { AuthRepository, AuthUser } from "@/modules/auth/repository";
 import { hashPassword, verifyPassword } from "@/modules/auth/service";
+
+function createAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
+  return {
+    id: "user-1",
+    username: "owner",
+    passwordHash: null,
+    role: "ADMIN",
+    isActive: true,
+    sessionVersion: 0,
+    lastLoginAt: null,
+    createdAt: new Date("2026-07-01T00:00:00Z"),
+    ...overrides,
+  };
+}
 
 test("patchAccountForUser clears the session after a successful credential update", async () => {
   let cleared = false;
   const currentPasswordHash = await hashPassword("current-password");
   const repository: AuthRepository = {
     async findById() {
-      return {
-        id: "user-1",
-        username: "owner",
+      return createAuthUser({
         passwordHash: currentPasswordHash,
-        createdAt: new Date("2026-07-01T00:00:00Z"),
-      };
+      });
     },
     async findByUsername() {
       return null;
@@ -37,12 +48,15 @@ test("patchAccountForUser clears the session after a successful credential updat
       throw new Error("createFirstAdministrator should not run");
     },
     async update(id, data) {
-      return {
+      return createAuthUser({
         id,
         username: typeof data.username === "string" ? data.username : "owner",
         passwordHash: typeof data.passwordHash === "string" ? data.passwordHash : null,
-        createdAt: new Date("2026-07-01T00:00:00Z"),
-      };
+        sessionVersion:
+          typeof data.sessionVersion === "object" && data.sessionVersion
+            ? 1
+            : 0,
+      });
     },
   };
 
@@ -68,12 +82,9 @@ test("patchAccountHandler clears the session after a successful password update"
   const currentPasswordHash = await hashPassword("current-password");
   const repository: AuthRepository = {
     async findById() {
-      return {
-        id: "user-1",
-        username: "owner",
+      return createAuthUser({
         passwordHash: currentPasswordHash,
-        createdAt: new Date("2026-07-01T00:00:00Z"),
-      };
+      });
     },
     async findByUsername() {
       return null;
@@ -95,10 +106,15 @@ test("patchAccountHandler clears the session after a successful password update"
         typeof data.passwordHash === "string" ? data.passwordHash : null;
 
       return {
-        id,
-        username: "owner",
-        passwordHash: savedPasswordHash,
-        createdAt: new Date("2026-07-01T00:00:00Z"),
+        ...createAuthUser({
+          id,
+          username: "owner",
+          passwordHash: savedPasswordHash,
+          sessionVersion:
+            typeof data.sessionVersion === "object" && data.sessionVersion
+              ? 1
+              : 0,
+        }),
       };
     },
   };
@@ -123,7 +139,12 @@ test("patchAccountHandler clears the session after a successful password update"
       async requireSession() {
         return {
           response: null,
-          session: { sub: "user-1", username: "owner" },
+          session: {
+            sub: "user-1",
+            username: "owner",
+            role: "ADMIN",
+            sessionVersion: 0,
+          },
         };
       },
     },
@@ -142,12 +163,9 @@ test("patchAccountForUser does not clear the session when credential validation 
   const currentPasswordHash = await hashPassword("current-password");
   const repository: AuthRepository = {
     async findById() {
-      return {
-        id: "user-1",
-        username: "owner",
+      return createAuthUser({
         passwordHash: currentPasswordHash,
-        createdAt: new Date("2026-07-01T00:00:00Z"),
-      };
+      });
     },
     async findByUsername() {
       return null;
