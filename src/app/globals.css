@@ -445,6 +445,11 @@ button:disabled {
   margin: 0;
 }
 
+.success {
+  color: var(--accent-strong);
+  margin: 0;
+}
+
 .management-grid {
   display: grid;
   gap: 1.5rem;
@@ -461,6 +466,51 @@ button:disabled {
 
 .account-settings-card {
   width: 100%;
+}
+
+.deployment-panel {
+  gap: 1.2rem;
+}
+
+.deployment-detail-grid dd {
+  overflow-wrap: anywhere;
+}
+
+.deployment-image-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.deployment-image-grid code {
+  display: block;
+  min-height: 3rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid rgba(67, 82, 52, 0.12);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.deployment-actions {
+  display: grid;
+  gap: 1rem;
+}
+
+.deployment-update-form {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.deployment-restore-field {
+  align-items: flex-start;
+}
+
+.danger-button {
+  background: linear-gradient(135deg, #b42318, #7a271a);
 }
 
 .management-highlight-grid {
@@ -871,6 +921,8 @@ button:disabled {
 @media (max-width: 900px) {
   .login-layout,
   .account-settings-grid,
+  .deployment-image-grid,
+  .deployment-update-form,
   .management-grid,
   .management-highlight-grid,
   .field-row,

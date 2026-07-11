@@ -10,6 +10,7 @@ services:
       ALM_DATA_DIR: /var/lib/alm-system/data
       ALM_STORAGE_ROOT: /var/lib/alm-system
       ALM_UPDATE_STATE_DIR: /var/lib/alm-system/update-state
+      ALM_UPDATE_TARGET_IMAGE: ${ALM_UPDATE_TARGET_IMAGE:-ghcr.io/peter-kung/alm-system-web:latest}
       ALM_UPLOADS_DIR: /var/lib/alm-system/uploads
       DATABASE_URL: file:/var/lib/alm-system/data/alm-system.db
       HOSTNAME: 0.0.0.0
@@ -18,10 +19,10 @@ services:
     ports:
       - "${ALM_HTTP_BIND:-127.0.0.1}:${ALM_HTTP_PORT:-3000}:3000"
     volumes:
-      - ./data:/var/lib/alm-system/data
-      - ./backups:/var/lib/alm-system/backups
-      - ./update-state:/var/lib/alm-system/update-state
-      - ./uploads:/var/lib/alm-system/uploads
+      - ${ALM_DEPLOY_ROOT:-.}/data:/var/lib/alm-system/data
+      - ${ALM_DEPLOY_ROOT:-.}/backups:/var/lib/alm-system/backups
+      - ${ALM_DEPLOY_ROOT:-.}/update-state:/var/lib/alm-system/update-state
+      - ${ALM_DEPLOY_ROOT:-.}/uploads:/var/lib/alm-system/uploads
     healthcheck:
       test:
         - CMD-SHELL

@@ -109,9 +109,11 @@ if [ ! -f "${deploy_root}/.env" ]; then
 APP_NAME=ALM System
 APP_SETUP_TOKEN=${setup_token}
 SESSION_SECRET=${session_secret}
+ALM_DEPLOY_ROOT=${deploy_root}
 ALM_HTTP_PORT=${http_port}
 ALM_HTTP_BIND=${http_bind}
 ALM_IMAGE=${image}
+ALM_UPDATE_TARGET_IMAGE=${image}
 ALM_CONTAINER_NAME=${container_name}
 EOF
 

@@ -12,6 +12,8 @@ env_file="${deploy_root}/.env"
 compose_file="${deploy_root}/docker-compose.yml"
 state_dir="${deploy_root}/update-state"
 state_file="${state_dir}/last-update.json"
+pending_operation_file="${state_dir}/pending-operation.json"
+processing_operation_file="${state_dir}/processing-operation.json"
 lock_file="${state_dir}/update.lock"
 data_dir="${deploy_root}/data"
 backup_dir="${deploy_root}/backups"
@@ -463,6 +465,51 @@ print_status() {
   fi
 }
 
+read_pending_boolean_string() {
+  local key="$1"
+  local file="$2"
+
+  sed -n 's/^[[:space:]]*"'"$key"'"[[:space:]]*:[[:space:]]*"\(true\|false\)",\{0,1\}[[:space:]]*$/\1/p' "$file" \
+    | tail -n 1
+}
+
+run_pending_operation() {
+  [ -f "$pending_operation_file" ] || fail "No pending update operation found at ${pending_operation_file}."
+  if [ -e "$processing_operation_file" ]; then
+    fail "A claimed update operation already exists at ${processing_operation_file}. If no update runner is active, inspect that file before moving or removing it."
+  fi
+  if ! mv "$pending_operation_file" "$processing_operation_file"; then
+    fail "Could not claim pending update operation at ${pending_operation_file}."
+  fi
+
+  local operation
+  local target_image
+  local restore_database
+
+  operation="$(read_json_string operation "$processing_operation_file")"
+  target_image="$(read_json_string targetImage "$processing_operation_file")"
+  restore_database="$(read_pending_boolean_string restoreDatabase "$processing_operation_file")"
+
+  case "$operation" in
+    update)
+      rm -f "$processing_operation_file"
+      run_update "${target_image:-}"
+      ;;
+    rollback)
+      rm -f "$processing_operation_file"
+      if [ "$restore_database" = "true" ]; then
+        run_rollback --restore-database
+      else
+        run_rollback
+      fi
+      ;;
+    *)
+      mv "$processing_operation_file" "$pending_operation_file" 2>/dev/null || true
+      fail "Pending update operation must be update or rollback."
+      ;;
+  esac
+}
+
 case "$command" in
   update)
     require_deployment
@@ -484,11 +531,20 @@ case "$command" in
     require_deployment
     print_status
     ;;
+  run-request)
+    require_deployment
+    acquire_lock
+    require_tools
+    validate_health_config
+    load_deployment_config
+    run_pending_operation
+    ;;
   *)
     cat >&2 <<EOF
 Usage:
   ALM_DEPLOY_ROOT=/opt/alm-system $0 update [image]
   ALM_DEPLOY_ROOT=/opt/alm-system $0 rollback [--restore-database]
+  ALM_DEPLOY_ROOT=/opt/alm-system $0 run-request
   ALM_DEPLOY_ROOT=/opt/alm-system $0 status
 EOF
     exit 2

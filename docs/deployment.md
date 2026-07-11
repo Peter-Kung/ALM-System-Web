@@ -141,6 +141,43 @@ When validation succeeds, `update-state/last-update.json` records `succeeded`,
 the previous image, the target image, the active image, the backup path, and the
 update time.
 
+## Administrator update UI
+
+Administrators can also inspect and start deployment operations from
+**Settings > Version and updates** in the authenticated app.
+
+The app reads:
+
+- The current running image from `ALM_IMAGE`.
+- The update target from `ALM_UPDATE_TARGET_IMAGE`.
+- The last update result from `update-state/last-update.json`.
+- The last in-app version check time from `update-state/last-check.json`.
+- The pending in-app operation request from `update-state/pending-operation.json`.
+
+The **Check updates** action records a new check time and refreshes the displayed
+version state. The **Start update** and **Start rollback** actions record a
+pending operation request under `update-state/pending-operation.json`.
+
+Run the host-side request processor from the deployment root to execute the
+pending operation:
+
+```bash
+cd /opt/alm-system
+sudo ./update.sh run-request
+```
+
+The host-side processor uses the same update and rollback orchestration as the
+CLI. The application container does not mount the Docker socket and does not
+run Docker commands itself.
+
+To change the image offered by the UI update form by default, edit
+`ALM_UPDATE_TARGET_IMAGE` in `.env`, then recreate the app container:
+
+```bash
+cd /opt/alm-system
+sudo docker compose up -d
+```
+
 ## Rollback
 
 If image pull, startup, migration, or health validation fails, the update
