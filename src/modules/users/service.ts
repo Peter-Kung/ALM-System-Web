@@ -1,5 +1,6 @@
 import { Prisma, UserRole } from "@prisma/client";
 
+import { issueUserActionToken } from "@/modules/auth";
 import { RepositoryValidationError } from "@/lib/repository-utils";
 import {
   createUserManagementRepository,
@@ -150,29 +151,49 @@ export async function updateManagedUser(
 export async function requestManagedUserActivation(
   userId: string,
   repository: UserManagementRepository = createUserManagementRepository(),
+  now: Date = new Date(),
 ) {
   const user = await repository.findById(userId);
   if (!user) {
     throw new RepositoryValidationError("User was not found.");
   }
 
+  const actionToken = await issueUserActionToken(
+    user.id,
+    "ACCOUNT_ACTIVATION",
+    repository,
+    now,
+  );
+
   return {
     user: serializeUser(user),
     delivery: "pending_self_managed_onboarding" as const,
+    expiresAt: actionToken.expiresAt.toISOString(),
+    tokenType: actionToken.tokenType,
   };
 }
 
 export async function requestManagedUserPasswordReset(
   userId: string,
   repository: UserManagementRepository = createUserManagementRepository(),
+  now: Date = new Date(),
 ) {
   const user = await repository.findById(userId);
   if (!user) {
     throw new RepositoryValidationError("User was not found.");
   }
 
+  const actionToken = await issueUserActionToken(
+    user.id,
+    "PASSWORD_RESET",
+    repository,
+    now,
+  );
+
   return {
     user: serializeUser(user),
     delivery: "pending_self_managed_onboarding" as const,
+    expiresAt: actionToken.expiresAt.toISOString(),
+    tokenType: actionToken.tokenType,
   };
 }

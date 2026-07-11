@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import type { Prisma, UserActionTokenType } from "@prisma/client";
+
 import { RepositoryValidationError } from "@/lib/repository-utils";
 import type { ManagedUser, UserManagementRepository } from "@/modules/users";
 import {
   createManagedUser,
   listManagedUsers,
+  requestManagedUserActivation,
   requestManagedUserPasswordReset,
   updateManagedUser,
 } from "@/modules/users/service";
@@ -24,6 +27,18 @@ function createManagedUserFixture(overrides: Partial<ManagedUser>): ManagedUser 
   };
 }
 
+function parseOptionalDate(value: Date | string | null | undefined) {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return new Date(value);
+  }
+
+  return null;
+}
+
 function createRepositoryFixture(
   initialUsers: Partial<ManagedUser>[] = [],
 ): UserManagementRepository {
@@ -35,12 +50,28 @@ function createRepositoryFixture(
       ...user,
     }),
   );
+  const actionTokens: Array<{
+    consumedAt: Date | null;
+    createdAt: Date;
+    expiresAt: Date;
+    id: string;
+    invalidatedAt: Date | null;
+    tokenHash: string;
+    tokenType: UserActionTokenType;
+    updatedAt: Date;
+    userId: string;
+  }> = [];
+  let tokenCounter = 0;
 
   return {
     async countActiveAdmins() {
       return users.filter((user) => user.role === "ADMIN" && user.isActive).length;
     },
-    async create(data) {
+    async create(data: {
+      isActive: boolean;
+      role: "ADMIN" | "USER";
+      username: string;
+    }) {
       const user = createManagedUserFixture({
         id: `user-${users.length + 1}`,
         username: data.username,
@@ -52,11 +83,76 @@ function createRepositoryFixture(
       users.push(user);
       return user;
     },
-    async findById(id) {
+    async createUserActionToken(data: Prisma.UserActionTokenUncheckedCreateInput) {
+      tokenCounter += 1;
+      const createdAt = new Date("2026-07-11T00:00:00Z");
+      const token = {
+        id: `token-${tokenCounter}`,
+        userId: data.userId,
+        tokenType: data.tokenType,
+        tokenHash: data.tokenHash,
+        expiresAt: data.expiresAt instanceof Date ? data.expiresAt : new Date(data.expiresAt),
+        consumedAt: parseOptionalDate(data.consumedAt),
+        invalidatedAt: parseOptionalDate(data.invalidatedAt),
+        createdAt,
+        updatedAt: createdAt,
+      };
+      actionTokens.push(token);
+      return token;
+    },
+    async expireUserActionTokens(now: Date) {
+      let count = 0;
+      for (const token of actionTokens) {
+        if (
+          token.consumedAt === null &&
+          token.invalidatedAt === null &&
+          token.expiresAt.getTime() <= now.getTime()
+        ) {
+          token.invalidatedAt = now;
+          token.updatedAt = now;
+          count += 1;
+        }
+      }
+
+      return count;
+    },
+    async findById(id: string) {
       return users.find((user) => user.id === id) ?? null;
     },
-    async findByUsername(username) {
+    async findByUsername(username: string) {
       return users.find((user) => user.username === username) ?? null;
+    },
+    async findUserActionTokenByHash(tokenHash: string, tokenType: UserActionTokenType) {
+      return (
+        actionTokens
+          .filter((token) => token.tokenHash === tokenHash && token.tokenType === tokenType)
+          .sort(
+            (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+          )[0] ??
+        null
+      );
+    },
+    async invalidateActiveUserActionTokens(
+      userId: string,
+      tokenType: UserActionTokenType,
+      invalidatedAt: Date,
+    ) {
+      let count = 0;
+      for (const token of actionTokens) {
+        if (
+          token.userId === userId &&
+          token.tokenType === tokenType &&
+          token.consumedAt === null &&
+          token.invalidatedAt === null &&
+          token.expiresAt.getTime() > invalidatedAt.getTime()
+        ) {
+          token.invalidatedAt = invalidatedAt;
+          token.updatedAt = invalidatedAt;
+          count += 1;
+        }
+      }
+
+      return count;
     },
     async list() {
       return [...users].sort((left, right) =>
@@ -65,7 +161,22 @@ function createRepositoryFixture(
         ),
       );
     },
-    async update(id, data) {
+    async markUserActionTokenConsumed(tokenId: string, consumedAt: Date) {
+      const token = actionTokens.find((entry) => entry.id === tokenId);
+      if (
+        !token ||
+        token.consumedAt !== null ||
+        token.invalidatedAt !== null ||
+        token.expiresAt.getTime() <= consumedAt.getTime()
+      ) {
+        return null;
+      }
+
+      token.consumedAt = consumedAt;
+      token.updatedAt = consumedAt;
+      return token;
+    },
+    async update(id: string, data: Prisma.UserUncheckedUpdateInput) {
       const user = users.find((entry) => entry.id === id);
       if (!user) {
         throw new Error(`missing user ${id}`);
@@ -257,17 +368,60 @@ test("requestManagedUserPasswordReset does not return a password", async () => {
     },
   ]);
 
-  assert.deepEqual(await requestManagedUserPasswordReset("family-user", repository), {
-    user: {
+  assert.deepEqual(
+    await requestManagedUserPasswordReset(
+      "family-user",
+      repository,
+      new Date("2026-07-11T00:00:00Z"),
+    ),
+    {
+      user: {
+        id: "family-user",
+        username: "family",
+        role: "USER",
+        isActive: true,
+        sessionVersion: 0,
+        lastLoginAt: null,
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      },
+      delivery: "pending_self_managed_onboarding",
+      expiresAt: "2026-07-11T00:05:00.000Z",
+      tokenType: "PASSWORD_RESET",
+    },
+  );
+});
+
+test("requestManagedUserActivation returns activation metadata without a usable token", async () => {
+  const repository = createRepositoryFixture([
+    {
       id: "family-user",
       username: "family",
       role: "USER",
-      isActive: true,
-      sessionVersion: 0,
-      lastLoginAt: null,
-      createdAt: "2026-07-01T00:00:00.000Z",
-      updatedAt: "2026-07-01T00:00:00.000Z",
+      isActive: false,
     },
-    delivery: "pending_self_managed_onboarding",
-  });
+  ]);
+
+  assert.deepEqual(
+    await requestManagedUserActivation(
+      "family-user",
+      repository,
+      new Date("2026-07-11T00:00:00Z"),
+    ),
+    {
+      user: {
+        id: "family-user",
+        username: "family",
+        role: "USER",
+        isActive: false,
+        sessionVersion: 0,
+        lastLoginAt: null,
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z",
+      },
+      delivery: "pending_self_managed_onboarding",
+      expiresAt: "2026-07-11T00:05:00.000Z",
+      tokenType: "ACCOUNT_ACTIVATION",
+    },
+  );
 });

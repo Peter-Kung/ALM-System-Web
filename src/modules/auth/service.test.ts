@@ -1,14 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import type { Prisma, UserActionTokenType } from "@prisma/client";
+
 import type { AuthRepository, AuthUser } from "@/modules/auth/repository";
+import type { UserActionTokenRepository } from "@/modules/auth/action-token";
 import { RepositoryValidationError } from "@/lib/repository-utils";
 import {
+  consumeUserActionToken,
   createFirstAdministrator,
   ensureConfiguredAdministrator,
+  expireUserActionTokens,
   hashPassword,
   isBootstrapRequired,
+  issueUserActionToken,
   updateAccountCredentials,
+  validateUserActionToken,
   validateOwnerLogin,
   validateSessionPayload,
   verifyPassword,
@@ -28,7 +35,21 @@ function createAuthUser(overrides: Partial<AuthUser>): AuthUser {
   };
 }
 
-function createRepositoryFixture(initialUsers: Partial<AuthUser>[] = []): AuthRepository {
+function parseOptionalDate(value: Date | string | null | undefined) {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return new Date(value);
+  }
+
+  return null;
+}
+
+function createRepositoryFixture(
+  initialUsers: Partial<AuthUser>[] = [],
+): AuthRepository & UserActionTokenRepository {
   const users = initialUsers.map((user, index) =>
     createAuthUser({
       id: `user-${index + 1}`,
@@ -36,12 +57,24 @@ function createRepositoryFixture(initialUsers: Partial<AuthUser>[] = []): AuthRe
       ...user,
     }),
   );
+  const actionTokens: Array<{
+    consumedAt: Date | null;
+    createdAt: Date;
+    expiresAt: Date;
+    id: string;
+    invalidatedAt: Date | null;
+    tokenHash: string;
+    tokenType: UserActionTokenType;
+    updatedAt: Date;
+    userId: string;
+  }> = [];
+  let tokenCounter = 0;
 
   return {
-    async findById(id) {
+    async findById(id: string) {
       return users.find((user) => user.id === id) ?? null;
     },
-    async findByUsername(username) {
+    async findByUsername(username: string) {
       return users.find((user) => user.username === username) ?? null;
     },
     async findFirstUser() {
@@ -50,7 +83,7 @@ function createRepositoryFixture(initialUsers: Partial<AuthUser>[] = []): AuthRe
     async findFirstUserWithPasswordHash() {
       return users.find((user) => user.passwordHash) ?? null;
     },
-    async create(data) {
+    async create(data: Prisma.UserCreateInput) {
       const user = createAuthUser({
         id: `user-${users.length + 1}`,
         username: data.username,
@@ -64,7 +97,7 @@ function createRepositoryFixture(initialUsers: Partial<AuthUser>[] = []): AuthRe
       users.push(user);
       return user;
     },
-    async createFirstAdministrator(data) {
+    async createFirstAdministrator(data: { passwordHash: string; username: string }) {
       const user = createAuthUser({
         id: `user-${users.length + 1}`,
         username: data.username,
@@ -74,7 +107,7 @@ function createRepositoryFixture(initialUsers: Partial<AuthUser>[] = []): AuthRe
       users.push(user);
       return user;
     },
-    async update(id, data) {
+    async update(id: string, data: Prisma.UserUncheckedUpdateInput) {
       const user = users.find((entry) => entry.id === id);
       if (!user) {
         throw new Error(`missing user ${id}`);
@@ -112,6 +145,91 @@ function createRepositoryFixture(initialUsers: Partial<AuthUser>[] = []): AuthRe
       }
 
       return user;
+    },
+    async createUserActionToken(data: Prisma.UserActionTokenUncheckedCreateInput) {
+      tokenCounter += 1;
+      const createdAt = new Date("2026-07-10T00:00:00Z");
+      const token = {
+        id: `token-${tokenCounter}`,
+        userId: data.userId,
+        tokenType: data.tokenType,
+        tokenHash: data.tokenHash,
+        expiresAt: data.expiresAt instanceof Date ? data.expiresAt : new Date(data.expiresAt),
+        consumedAt: parseOptionalDate(data.consumedAt),
+        invalidatedAt: parseOptionalDate(data.invalidatedAt),
+        createdAt,
+        updatedAt: createdAt,
+      };
+      actionTokens.push(token);
+      return token;
+    },
+    async expireUserActionTokens(now: Date) {
+      let count = 0;
+      for (const token of actionTokens) {
+        if (
+          token.consumedAt === null &&
+          token.invalidatedAt === null &&
+          token.expiresAt.getTime() <= now.getTime()
+        ) {
+          token.invalidatedAt = now;
+          token.updatedAt = now;
+          count += 1;
+        }
+      }
+
+      return count;
+    },
+    async findUserActionTokenByHash(tokenHash: string, tokenType: UserActionTokenType) {
+      return (
+        actionTokens
+          .filter((token) => token.tokenHash === tokenHash && token.tokenType === tokenType)
+          .sort(
+            (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+          )[0] ??
+        null
+      );
+    },
+    async invalidateActiveUserActionTokens(
+      userId: string,
+      tokenType: UserActionTokenType,
+      invalidatedAt: Date,
+    ) {
+      let count = 0;
+      for (const token of actionTokens) {
+        if (
+          token.userId === userId &&
+          token.tokenType === tokenType &&
+          token.consumedAt === null &&
+          token.invalidatedAt === null &&
+          token.expiresAt.getTime() > invalidatedAt.getTime()
+        ) {
+          token.invalidatedAt = invalidatedAt;
+          token.updatedAt = invalidatedAt;
+          count += 1;
+        }
+      }
+
+      return count;
+    },
+    async markUserActionTokenConsumed(tokenId: string, consumedAt: Date) {
+      const token = actionTokens.find((entry) => entry.id === tokenId);
+      if (
+        !token ||
+        token.consumedAt !== null ||
+        token.invalidatedAt !== null ||
+        token.expiresAt.getTime() <= consumedAt.getTime()
+      ) {
+        return null;
+      }
+
+      token.consumedAt = consumedAt;
+      token.updatedAt = consumedAt;
+      return token;
+    },
+    async withTransaction<T>(
+      operation: (repository: UserActionTokenRepository) => Promise<T>,
+    ) {
+      return operation(this);
     },
   };
 }
@@ -640,5 +758,123 @@ test("updateAccountCredentials rejects invalid username and password updates", a
     (error: unknown) =>
       error instanceof RepositoryValidationError &&
       error.message === "New password and confirmation must match.",
+  );
+});
+
+test("issueUserActionToken invalidates replaced tokens and validates only the newest token", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("current-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const firstToken = await issueUserActionToken(
+    "user-1",
+    "ACCOUNT_ACTIVATION",
+    repository,
+    new Date("2026-07-10T12:00:00Z"),
+  );
+  const secondToken = await issueUserActionToken(
+    "user-1",
+    "ACCOUNT_ACTIVATION",
+    repository,
+    new Date("2026-07-10T12:01:00Z"),
+  );
+
+  assert.equal(
+    await validateUserActionToken(
+      firstToken.token,
+      "ACCOUNT_ACTIVATION",
+      repository,
+      new Date("2026-07-10T12:01:30Z"),
+    ),
+    null,
+  );
+
+  const validatedToken = await validateUserActionToken(
+    secondToken.token,
+    "ACCOUNT_ACTIVATION",
+    repository,
+    new Date("2026-07-10T12:01:30Z"),
+  );
+
+  assert.ok(validatedToken);
+  assert.equal(validatedToken.userId, "user-1");
+  assert.equal(validatedToken.tokenType, "ACCOUNT_ACTIVATION");
+  assert.equal(validatedToken.expiresAt.toISOString(), "2026-07-10T12:06:00.000Z");
+  assert.equal(validatedToken.consumedAt, null);
+  assert.equal(validatedToken.invalidatedAt, null);
+  assert.notEqual(firstToken.token, secondToken.token);
+});
+
+test("consumeUserActionToken makes a password reset token one-time use", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("current-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const issuedToken = await issueUserActionToken(
+    "user-1",
+    "PASSWORD_RESET",
+    repository,
+    new Date("2026-07-10T12:00:00Z"),
+  );
+
+  const consumedToken = await consumeUserActionToken(
+    issuedToken.token,
+    "PASSWORD_RESET",
+    repository,
+    new Date("2026-07-10T12:03:00Z"),
+  );
+
+  assert.ok(consumedToken);
+  assert.equal(consumedToken.consumedAt?.toISOString(), "2026-07-10T12:03:00.000Z");
+  assert.equal(
+    await consumeUserActionToken(
+      issuedToken.token,
+      "PASSWORD_RESET",
+      repository,
+      new Date("2026-07-10T12:03:01Z"),
+    ),
+    null,
+  );
+});
+
+test("validateUserActionToken rejects expired tokens and expireUserActionTokens invalidates them", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("current-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const issuedToken = await issueUserActionToken(
+    "user-1",
+    "TELEGRAM_BINDING",
+    repository,
+    new Date("2026-07-10T12:00:00Z"),
+  );
+
+  assert.equal(
+    await validateUserActionToken(
+      issuedToken.token,
+      "TELEGRAM_BINDING",
+      repository,
+      new Date("2026-07-10T12:05:01Z"),
+    ),
+    null,
+  );
+  assert.equal(
+    await expireUserActionTokens(repository, new Date("2026-07-10T12:05:01Z")),
+    1,
   );
 });

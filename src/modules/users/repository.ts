@@ -1,4 +1,4 @@
-import type { Prisma, User } from "@prisma/client";
+import type { Prisma, User, UserActionToken, UserActionTokenType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import type { PrismaExecutor } from "@/lib/prisma-executor";
@@ -15,6 +15,19 @@ export type ManagedUser = Pick<
   | "updatedAt"
 >;
 
+export type ManagedUserActionToken = Pick<
+  UserActionToken,
+  | "id"
+  | "userId"
+  | "tokenType"
+  | "tokenHash"
+  | "expiresAt"
+  | "consumedAt"
+  | "invalidatedAt"
+  | "createdAt"
+  | "updatedAt"
+>;
+
 const managedUserSelect = {
   id: true,
   username: true,
@@ -26,6 +39,18 @@ const managedUserSelect = {
   updatedAt: true,
 } satisfies Prisma.UserSelect;
 
+const managedUserActionTokenSelect = {
+  id: true,
+  userId: true,
+  tokenType: true,
+  tokenHash: true,
+  expiresAt: true,
+  consumedAt: true,
+  invalidatedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.UserActionTokenSelect;
+
 export type UserManagementRepository = {
   countActiveAdmins(): Promise<number>;
   create(data: {
@@ -33,9 +58,26 @@ export type UserManagementRepository = {
     role: "ADMIN" | "USER";
     username: string;
   }): Promise<ManagedUser>;
+  createUserActionToken(
+    data: Prisma.UserActionTokenUncheckedCreateInput,
+  ): Promise<ManagedUserActionToken>;
+  expireUserActionTokens(now: Date): Promise<number>;
   findById(id: string): Promise<ManagedUser | null>;
   findByUsername(username: string): Promise<ManagedUser | null>;
+  findUserActionTokenByHash(
+    tokenHash: string,
+    tokenType: UserActionTokenType,
+  ): Promise<ManagedUserActionToken | null>;
+  invalidateActiveUserActionTokens(
+    userId: string,
+    tokenType: UserActionTokenType,
+    invalidatedAt: Date,
+  ): Promise<number>;
   list(): Promise<ManagedUser[]>;
+  markUserActionTokenConsumed(
+    tokenId: string,
+    consumedAt: Date,
+  ): Promise<ManagedUserActionToken | null>;
   update(id: string, data: Prisma.UserUncheckedUpdateInput): Promise<ManagedUser>;
   withTransaction<T>(
     operation: (repository: UserManagementRepository) => Promise<T>,
@@ -69,6 +111,30 @@ export function createUserManagementRepository(
         select: managedUserSelect,
       });
     },
+    createUserActionToken(
+      data: Prisma.UserActionTokenUncheckedCreateInput,
+    ): Promise<ManagedUserActionToken> {
+      return db.userActionToken.create({
+        data,
+        select: managedUserActionTokenSelect,
+      });
+    },
+    expireUserActionTokens(now: Date): Promise<number> {
+      return db.userActionToken
+        .updateMany({
+          where: {
+            consumedAt: null,
+            invalidatedAt: null,
+            expiresAt: {
+              lte: now,
+            },
+          },
+          data: {
+            invalidatedAt: now,
+          },
+        })
+        .then((result) => result.count);
+    },
     findById(id: string): Promise<ManagedUser | null> {
       return db.user.findUnique({
         where: { id },
@@ -81,10 +147,73 @@ export function createUserManagementRepository(
         select: managedUserSelect,
       });
     },
+    findUserActionTokenByHash(
+      tokenHash: string,
+      tokenType: UserActionTokenType,
+    ): Promise<ManagedUserActionToken | null> {
+      return db.userActionToken.findFirst({
+        where: {
+          tokenHash,
+          tokenType,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: managedUserActionTokenSelect,
+      });
+    },
+    invalidateActiveUserActionTokens(
+      userId: string,
+      tokenType: UserActionTokenType,
+      invalidatedAt: Date,
+    ): Promise<number> {
+      return db.userActionToken
+        .updateMany({
+          where: {
+            userId,
+            tokenType,
+            consumedAt: null,
+            invalidatedAt: null,
+            expiresAt: {
+              gt: invalidatedAt,
+            },
+          },
+          data: {
+            invalidatedAt,
+          },
+        })
+        .then((result) => result.count);
+    },
     list(): Promise<ManagedUser[]> {
       return db.user.findMany({
         orderBy: [{ role: "asc" }, { username: "asc" }],
         select: managedUserSelect,
+      });
+    },
+    async markUserActionTokenConsumed(
+      tokenId: string,
+      consumedAt: Date,
+    ): Promise<ManagedUserActionToken | null> {
+      const result = await db.userActionToken.updateMany({
+        where: {
+          id: tokenId,
+          consumedAt: null,
+          invalidatedAt: null,
+          expiresAt: {
+            gt: consumedAt,
+          },
+        },
+        data: {
+          consumedAt,
+        },
+      });
+      if (result.count === 0) {
+        return null;
+      }
+
+      return db.userActionToken.findUnique({
+        where: { id: tokenId },
+        select: managedUserActionTokenSelect,
       });
     },
     update(id: string, data: Prisma.UserUncheckedUpdateInput): Promise<ManagedUser> {

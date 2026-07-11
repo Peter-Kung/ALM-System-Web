@@ -37,6 +37,13 @@ export async function verifyPassword(password: string, passwordHash: string) {
   return bcrypt.compare(password, passwordHash);
 }
 
+export {
+  consumeUserActionToken,
+  expireUserActionTokens,
+  issueUserActionToken,
+  validateUserActionToken,
+} from "@/modules/auth/action-token";
+
 async function backfillLegacyOwner(
   repository: AuthRepository,
   user: AuthUser,
