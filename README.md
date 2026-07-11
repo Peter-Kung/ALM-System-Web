@@ -4,13 +4,28 @@ ALM System Web is a private single-user net worth app. It stores editable
 accounts, assets, holdings, liabilities, and price records, then turns those
 inputs into immutable valuation snapshots for dashboard reporting.
 
-Use this README for local setup and local evaluation. For product behavior
-details, start with [docs/index.md](docs/index.md).
+Use this README to choose an installation path. For product behavior details
+and the full documentation index, start with [docs/index.md](docs/index.md).
+
+## Installation paths
+
+- Use [Local setup](#local-setup) when you want to run the app from this source
+  checkout for development or local evaluation.
+- Use [Docker Compose deployment](docs/deployment.md) when you want to run the
+  supported single-host self-hosted deployment from the published Docker image.
+
+The local setup path uses Node.js, npm, Prisma, and a local SQLite database in
+the checkout. The Docker path uses the installer under `deploy/`, writes
+runtime files under the deployment root, and manages the application container
+with Docker Compose.
 
 ## Prerequisites
 
 - Node.js 20 or later
 - npm
+
+These prerequisites apply to local setup. Docker deployment requirements are
+listed in [Docker Compose deployment](docs/deployment.md#requirements).
 
 ## Local setup
 
@@ -60,6 +75,18 @@ and `DATABASE_URL`. After the owner account has a stored password hash, normal
 sign-ins use the account credentials in the database. The `APP_USERNAME` and
 `APP_PASSWORD` values remain compatibility inputs for initialization or upgrade
 when no stored password hash exists yet.
+
+## Self-hosted Docker deployment
+
+The supported Docker deployment is a single-host Docker Compose installation.
+It installs the published image, creates the deployment root, persists the
+SQLite database and update state outside the image, and exposes the app on
+`127.0.0.1:3000` by default.
+
+Follow [Docker Compose deployment](docs/deployment.md) for install, setup,
+operations, update, rollback, backup, and removal guidance. Do not use the
+local development commands in this README as a substitute for the Docker
+deployment flow.
 
 ## Common commands
 

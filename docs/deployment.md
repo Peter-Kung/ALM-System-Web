@@ -223,3 +223,38 @@ To inspect the last update result, run:
 cd /opt/alm-system
 sudo ./update.sh status
 ```
+
+## Back Up Data
+
+The update command stops the app and creates a SQLite database backup under
+`backups/` before it starts an update when the database exists. For manual
+maintenance or host migration, stop the app before copying the database, then
+start it again after the copy succeeds:
+
+```bash
+cd /opt/alm-system
+sudo docker compose stop app
+sudo mkdir -p backups
+sudo cp -p data/alm-system.db "backups/alm-system-manual-$(date -u +%Y%m%dT%H%M%SZ).db"
+sudo docker compose up -d
+```
+
+Also save `.env` with the backup set. It contains deployment configuration and
+secrets that are required to restart the same deployment.
+
+## Remove the Deployment
+
+There is no separate uninstall command. To remove a Docker deployment, stop the
+container and remove the deployment root after you have copied out any data you
+want to keep:
+
+```bash
+cd /opt/alm-system
+sudo docker compose down
+cd /
+sudo rm -rf /opt/alm-system
+```
+
+If you installed to a custom root, replace `/opt/alm-system` with that path. The
+removal command deletes the SQLite database, backups, update state, uploads, and
+deployment secrets in that root.
