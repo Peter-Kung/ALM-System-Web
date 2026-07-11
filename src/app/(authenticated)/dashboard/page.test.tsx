@@ -121,17 +121,24 @@ function createDashboardSummary(): DashboardSummary {
 
 test("dashboard route renders the dedicated reminders area after authenticated summary load", async () => {
   const requestedUserIds: string[] = [];
+  const requestedSelectedDates: Array<string | null | undefined> = [];
   const DashboardPage = createDashboardPage({
     getSession: async () => ({ sub: "user-1", username: "owner" }),
-    createDashboardSummary: async (userId) => {
+    createDashboardSummary: async (userId, options) => {
       requestedUserIds.push(userId);
+      requestedSelectedDates.push(options.selectedDate);
       return createDashboardSummary();
     },
   });
 
-  const markup = renderToStaticMarkup(await DashboardPage());
+  const markup = renderToStaticMarkup(
+    await DashboardPage({
+      searchParams: Promise.resolve({ trendDate: "2026-07-03" }),
+    }),
+  );
 
   assert.deepEqual(requestedUserIds, ["user-1"]);
+  assert.deepEqual(requestedSelectedDates, ["2026-07-03"]);
   assert.match(markup, /<h2>Reminders<\/h2>/);
   assert.match(markup, /Missing valid price record for Global Fund\./);
   assert.ok(

@@ -15,16 +15,17 @@ import {
   type DashboardAmountDisplayMode,
   formatDashboardAmount,
 } from "@/components/dashboard-amount-format";
-import type { DashboardTrendPoint } from "@/modules/dashboard/service";
+import type { DashboardTrend, DashboardTrendPoint } from "@/modules/dashboard/service";
 
 const TREND_SERIES = [
-  { key: "netWorth", label: "Net worth", color: "#7d8f5a" },
-  { key: "totalAssets", label: "Total assets", color: "#c79d5c" },
-  { key: "totalLiabilities", label: "Total liabilities", color: "#d4684c" },
+  { key: "netWorth", label: "Net worth", color: "#556b3d" },
+  { key: "totalAssets", label: "Assets", color: "#b8843f" },
+  { key: "totalLiabilities", label: "Liabilities", color: "#bd5a45" },
+  { key: "monthlyDebtPaymentTotal", label: "Monthly debt payments", color: "#4f7f91" },
 ] as const;
 
 type DashboardTrendCardProps = {
-  trendSeries: DashboardTrendPoint[];
+  trend: DashboardTrend | null;
   baseCurrency: string;
   amountDisplayMode: DashboardAmountDisplayMode;
 };
@@ -35,33 +36,60 @@ type TrendDatum = {
   netWorth: number;
   totalAssets: number;
   totalLiabilities: number;
+  monthlyDebtPaymentTotal: number;
 };
 
 export function DashboardTrendCard({
-  trendSeries,
+  trend,
   baseCurrency,
   amountDisplayMode,
 }: DashboardTrendCardProps) {
-  if (trendSeries.length < 2) {
+  if (!trend || trend.visiblePoints.length === 0) {
     return null;
   }
 
-  const chartData = trendSeries.map((point) => ({
+  const chartData = trend.visiblePoints.map((point) => ({
     date: point.date,
     shortDate: formatShortDate(point.date),
     netWorth: Number(point.netWorth),
     totalAssets: Number(point.totalAssets),
     totalLiabilities: Number(point.totalLiabilities),
+    monthlyDebtPaymentTotal: Number(point.monthlyDebtPaymentTotal),
   }));
   const latestPoint = chartData[chartData.length - 1];
   const axisLayout = getDashboardTrendAxisLayout(amountDisplayMode);
+  const previousDate = trend.previousDate;
+  const nextDate =
+    trend.selectedDate < trend.latestSelectableDate
+      ? addUtcCalendarDays(trend.selectedDate, 1)
+      : null;
+  const selectedShortDate = formatShortDate(trend.selectedDate);
+  const latestShortDate = formatShortDate(trend.latestSelectableDate);
 
   return (
     <article className="resource-card stack dashboard-trend-card">
       <div className="section-heading">
         <div>
-          <h2>Trend</h2>
-          <p className="muted">Saved snapshot history across the latest two or more records.</p>
+          <p className="eyebrow">Trend summary</p>
+          <h2>Daily line trend</h2>
+          <p className="muted">
+            {selectedShortDate} to {latestShortDate}, with missing days carried forward.
+          </p>
+        </div>
+        <div className="dashboard-trend-controls" aria-label="Trend date controls">
+          <TrendDateButton direction="previous" targetDate={previousDate} />
+          <label className="dashboard-date-picker">
+            <span className="visually-hidden">Trend start date</span>
+            <input
+              type="date"
+              name="trendDate"
+              min={trend.firstSelectableDate}
+              max={trend.latestSelectableDate}
+              defaultValue={trend.selectedDate}
+              onChange={(event) => navigateToTrendDate(event.currentTarget.value)}
+            />
+          </label>
+          <TrendDateButton direction="next" targetDate={nextDate} />
         </div>
       </div>
 
@@ -136,13 +164,14 @@ export function DashboardTrendCard({
       </div>
 
       <table className="visually-hidden">
-        <caption>Snapshot trend history</caption>
+        <caption>Daily trend history</caption>
         <thead>
           <tr>
-            <th scope="col">Snapshot date</th>
+            <th scope="col">Date</th>
             <th scope="col">Net worth</th>
-            <th scope="col">Total assets</th>
-            <th scope="col">Total liabilities</th>
+            <th scope="col">Assets</th>
+            <th scope="col">Liabilities</th>
+            <th scope="col">Monthly debt payments</th>
           </tr>
         </thead>
         <tbody>
@@ -158,11 +187,44 @@ export function DashboardTrendCard({
                   amountDisplayMode,
                 )}
               </td>
+              <td>
+                {formatDashboardAmount(
+                  point.monthlyDebtPaymentTotal,
+                  baseCurrency,
+                  amountDisplayMode,
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </article>
+  );
+}
+
+type TrendDateButtonProps = {
+  direction: "previous" | "next";
+  targetDate: string | null;
+};
+
+function TrendDateButton({ direction, targetDate }: TrendDateButtonProps) {
+  const label = direction === "previous" ? "Previous day" : "Next day";
+  const icon = direction === "previous" ? "<" : ">";
+
+  return (
+    <button
+      type="button"
+      className="dashboard-trend-arrow"
+      disabled={!targetDate}
+      aria-label={label}
+      onClick={() => {
+        if (targetDate) {
+          navigateToTrendDate(targetDate);
+        }
+      }}
+    >
+      {icon}
+    </button>
   );
 }
 
@@ -215,4 +277,20 @@ function formatShortDate(value: string) {
     day: "numeric",
     timeZone: "UTC",
   });
+}
+
+function addUtcCalendarDays(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function navigateToTrendDate(value: string) {
+  if (!value) {
+    return;
+  }
+
+  const url = new URL("/dashboard", globalThis.location?.origin ?? "http://localhost");
+  url.searchParams.set("trendDate", value);
+  globalThis.location.assign(`${url.pathname}${url.search}`);
 }

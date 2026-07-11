@@ -227,7 +227,7 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
       />
 
       <DashboardTrendCard
-        trendSeries={dashboard.trendSeries}
+        trend={dashboard.trend}
         baseCurrency={snapshot.baseCurrency}
         amountDisplayMode={amountDisplayMode}
       />

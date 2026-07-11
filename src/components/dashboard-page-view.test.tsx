@@ -250,10 +250,12 @@ test("dashboard page view renders summary-first sections and limits reminders to
   assert.match(markup, /Reminders/);
   assert.match(markup, /Next up/);
   assert.match(markup, /Coverage/);
-  assert.match(markup, /Trend/);
+  assert.match(markup, /Trend summary/);
+  assert.match(markup, /Daily line trend/);
   assert.match(markup, /Net worth/);
-  assert.match(markup, /Total assets/);
-  assert.match(markup, /Total liabilities/);
+  assert.match(markup, /Assets/);
+  assert.match(markup, /Liabilities/);
+  assert.match(markup, /Monthly debt payments/);
   assert.match(markup, /Jul 1/);
   assert.match(markup, /Jul 8/);
   assert.match(markup, /The latest snapshot is usable, but reminder items still need follow-up\./);
@@ -332,6 +334,35 @@ test("dashboard page view labels carried-forward trend points by calendar date",
   const markup = renderToStaticMarkup(
     <DashboardPageView
       dashboard={createDashboardSummary({
+        trend: {
+          firstSelectableDate: "2026-07-01",
+          latestSelectableDate: "2026-07-02",
+          defaultSelectedDate: "2026-07-02",
+          selectedDate: "2026-07-01",
+          previousDate: null,
+          netWorthChange: "0.00",
+          totalAssetsChange: "0.00",
+          totalLiabilitiesChange: "0.00",
+          monthlyDebtPaymentChange: "0.00",
+          visiblePoints: [
+            {
+              date: "2026-07-01",
+              snapshotAt: "2026-07-01T00:00:00.000Z",
+              netWorth: "720.00",
+              totalAssets: "1100.00",
+              totalLiabilities: "380.00",
+              monthlyDebtPaymentTotal: "115.00",
+            },
+            {
+              date: "2026-07-02",
+              snapshotAt: "2026-07-01T00:00:00.000Z",
+              netWorth: "720.00",
+              totalAssets: "1100.00",
+              totalLiabilities: "380.00",
+              monthlyDebtPaymentTotal: "115.00",
+            },
+          ],
+        },
         trendSeries: [
           {
             date: "2026-07-01",
@@ -356,6 +387,130 @@ test("dashboard page view labels carried-forward trend points by calendar date",
 
   assert.match(markup, /Jul 1/);
   assert.match(markup, /Jul 2/);
+});
+
+test("dashboard page view renders selectable trend controls with bounded dates", () => {
+  const markup = renderToStaticMarkup(
+    <DashboardPageView dashboard={createDashboardSummary()} />,
+  );
+
+  assert.match(
+    markup,
+    /<button type="button" class="dashboard-trend-arrow" disabled="" aria-label="Previous day"/,
+  );
+  assert.match(markup, /aria-label="Next day"/);
+  assert.doesNotMatch(markup, /aria-label="Next day" disabled=""/);
+  assert.match(markup, /type="date"/);
+  assert.match(markup, /min="2026-07-01"/);
+  assert.match(markup, /max="2026-07-08"/);
+  assert.match(markup, /value="2026-07-01"/);
+});
+
+test("dashboard trend controls remain available when the selected window has one point", () => {
+  const markup = renderToStaticMarkup(
+    <DashboardPageView
+      dashboard={createDashboardSummary({
+        trend: {
+          firstSelectableDate: "2026-07-01",
+          latestSelectableDate: "2026-07-08",
+          defaultSelectedDate: "2026-07-08",
+          selectedDate: "2026-07-08",
+          previousDate: "2026-07-07",
+          netWorthChange: "0.00",
+          totalAssetsChange: "0.00",
+          totalLiabilitiesChange: "0.00",
+          monthlyDebtPaymentChange: "0.00",
+          visiblePoints: [
+            {
+              date: "2026-07-08",
+              snapshotAt: "2026-07-08T00:00:00.000Z",
+              netWorth: "800.00",
+              totalAssets: "1200.00",
+              totalLiabilities: "400.00",
+              monthlyDebtPaymentTotal: "120.00",
+            },
+          ],
+        },
+      })}
+    />,
+  );
+
+  assert.match(markup, /Daily line trend/);
+  assert.match(markup, /aria-label="Previous day"/);
+  assert.doesNotMatch(markup, /aria-label="Previous day" disabled=""/);
+  assert.match(
+    markup,
+    /<button type="button" class="dashboard-trend-arrow" disabled="" aria-label="Next day"/,
+  );
+  assert.match(markup, /value="2026-07-08"/);
+});
+
+test("dashboard trend card renders the selected visible window only", () => {
+  const markup = renderToStaticMarkup(
+    <DashboardPageView
+      dashboard={createDashboardSummary({
+        trend: {
+          firstSelectableDate: "2026-07-01",
+          latestSelectableDate: "2026-07-08",
+          defaultSelectedDate: "2026-07-08",
+          selectedDate: "2026-07-03",
+          previousDate: "2026-07-02",
+          netWorthChange: "0.00",
+          totalAssetsChange: "0.00",
+          totalLiabilitiesChange: "0.00",
+          monthlyDebtPaymentChange: "0.00",
+          visiblePoints: [
+            {
+              date: "2026-07-03",
+              snapshotAt: "2026-07-01T00:00:00.000Z",
+              netWorth: "720.00",
+              totalAssets: "1100.00",
+              totalLiabilities: "380.00",
+              monthlyDebtPaymentTotal: "115.00",
+            },
+            {
+              date: "2026-07-04",
+              snapshotAt: "2026-07-04T00:00:00.000Z",
+              netWorth: "760.00",
+              totalAssets: "1140.00",
+              totalLiabilities: "380.00",
+              monthlyDebtPaymentTotal: "115.00",
+            },
+          ],
+        },
+        trendSeries: [
+          {
+            date: "2026-07-01",
+            snapshotAt: "2026-07-01T00:00:00.000Z",
+            netWorth: "720.00",
+            totalAssets: "1100.00",
+            totalLiabilities: "380.00",
+            monthlyDebtPaymentTotal: "115.00",
+          },
+          {
+            date: "2026-07-03",
+            snapshotAt: "2026-07-01T00:00:00.000Z",
+            netWorth: "720.00",
+            totalAssets: "1100.00",
+            totalLiabilities: "380.00",
+            monthlyDebtPaymentTotal: "115.00",
+          },
+          {
+            date: "2026-07-04",
+            snapshotAt: "2026-07-04T00:00:00.000Z",
+            netWorth: "760.00",
+            totalAssets: "1140.00",
+            totalLiabilities: "380.00",
+            monthlyDebtPaymentTotal: "115.00",
+          },
+        ],
+      })}
+    />,
+  );
+
+  assert.doesNotMatch(markup, /Jul 1/);
+  assert.match(markup, /Jul 3/);
+  assert.match(markup, /Jul 4/);
 });
 
 test("dashboard page view persists the full amount display preference", async () => {
@@ -473,5 +628,5 @@ test("dashboard page view hides the trend card when fewer than two snapshots exi
   );
 
   assert.doesNotMatch(markup, /<h2>Trend<\/h2>/);
-  assert.doesNotMatch(markup, /Saved snapshot history across the latest two or more records\./);
+  assert.doesNotMatch(markup, /Daily line trend/);
 });
