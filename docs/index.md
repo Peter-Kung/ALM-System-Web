@@ -1,6 +1,7 @@
 # ALM System Docs
 
 - [Local setup and usage](../README.md)
+- [Local QA setup](../README.md#local-qa-setup)
 - [Docker Compose deployment](./deployment.md)
 - [Overview](./overview.md)
 

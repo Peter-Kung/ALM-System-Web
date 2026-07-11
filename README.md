@@ -39,7 +39,7 @@ listed in [Docker Compose deployment](docs/deployment.md#requirements).
 2. Create a local `.env` file for Prisma and app startup:
 
    ```dotenv
-   DATABASE_URL="file:./prisma/dev.db"
+   DATABASE_URL="file:./dev.db"
    ```
 
 3. Generate the Prisma client:
@@ -61,6 +61,22 @@ listed in [Docker Compose deployment](docs/deployment.md#requirements).
    ```
 
 6. Open `http://localhost:3000`.
+
+### Local QA setup
+
+Run `npm run qa:setup` when you want a repeatable local QA setup instead of
+creating `.env` by hand.
+
+- On first run, the command creates a local `.env`, writes
+  `DATABASE_URL="file:./dev.db"`, `APP_USERNAME=qa-owner`, a generated
+  `APP_PASSWORD`, matching `APP_ADMIN_*` bootstrap credentials, and a generated
+  `SESSION_SECRET`.
+- The generated password is printed only when `.env` is first created. After
+  that, read `APP_PASSWORD` from your local `.env`.
+- The command preserves an existing `.env`, runs the standard Prisma generate
+  and migrate steps, and ends by telling you to start the app with
+  `npm run dev`.
+- `.env` is git-ignored. Do not commit local QA credentials.
 
 This repo requires `DATABASE_URL` to be set for Prisma commands and app
 runtime. In development, the app falls back to these defaults when you do not
@@ -108,6 +124,7 @@ deployment flow.
 ## Common commands
 
 - Start the dev server: `npm run dev`
+- Prepare a local QA environment: `npm run qa:setup`
 - Run tests: `npm run test`
 - Run TypeScript checks: `npm run typecheck`
 - Generate Prisma client: `npm run db:generate`
