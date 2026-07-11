@@ -145,6 +145,58 @@ test("updateAssetHandler accepts real estate asset type", async () => {
   assert.equal(updatedAssets[0]?.assetType, AssetType.REAL_ESTATE);
 });
 
+test("updateAssetHandler hides another user's asset id", async () => {
+  const { dependencies, updatedAssets } = createAssetFixture();
+
+  const response = await updateAssetHandler(
+    createJsonRequest({
+      name: "Other user's home",
+      assetType: AssetType.REAL_ESTATE,
+      symbol: null,
+      currency: "TWD",
+      priceSourceType: AssetPriceSourceType.MANUAL,
+      isActive: true,
+      notes: null,
+    }),
+    { assetId: "asset-owned-by-user-2" },
+    {
+      ...dependencies,
+      createRepository() {
+        const repository = dependencies.createRepository();
+
+        return {
+          ...repository,
+          async findById(id: string) {
+            if (id === "asset-owned-by-user-2") {
+              return {
+                id,
+                userId: "user-2",
+                name: "Private home",
+                assetType: AssetType.REAL_ESTATE,
+                symbol: null,
+                currency: "TWD",
+                priceSourceType: AssetPriceSourceType.MANUAL,
+                isActive: true,
+                notes: null,
+                createdAt: new Date("2026-07-01T00:00:00Z"),
+                updatedAt: new Date("2026-07-01T00:00:00Z"),
+                holdings: [],
+                priceRecords: [],
+              };
+            }
+
+            return repository.findById(id);
+          },
+        };
+      },
+    },
+  );
+
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { error: "Asset not found." });
+  assert.deepEqual(updatedAssets, []);
+});
+
 test("createAssetHandler keeps rejecting unsupported asset types", async () => {
   const { createdAssets, dependencies } = createAssetFixture();
 

@@ -12,7 +12,7 @@ import {
   SnapshotStatus,
 } from "@prisma/client";
 
-import { buildDashboardSummary } from "@/modules/dashboard";
+import { buildDashboardSummary, createDashboardSummaryForUser } from "@/modules/dashboard";
 
 function decimal(value: string) {
   return new Prisma.Decimal(value);
@@ -120,6 +120,40 @@ test("buildDashboardSummary returns empty dashboard data when no snapshots exist
   assert.equal(summary.trend, null);
   assert.deepEqual(summary.trendSeries, []);
   assert.deepEqual(summary.issueMessages, []);
+});
+
+test("createDashboardSummaryForUser reads snapshots only for the signed-in user", async () => {
+  const requestedUserIds: string[] = [];
+  const userBSnapshot = createSnapshot({
+    id: "snapshot-user-b",
+    userId: "user-b",
+    totalAssets: decimal("900.00"),
+    totalLiabilities: decimal("100.00"),
+    netWorth: decimal("800.00"),
+    snapshotAt: new Date("2026-07-09T00:00:00.000Z"),
+    createdAt: new Date("2026-07-09T00:00:00.000Z"),
+  });
+
+  const summary = await createDashboardSummaryForUser(
+    "user-b",
+    {},
+    {
+      snapshotRepository: {
+        async listByUser(userId, options) {
+          requestedUserIds.push(`latest:${userId}:${options?.take ?? "all"}`);
+          return userId === "user-b" ? [userBSnapshot] : [];
+        },
+        async listTrendByUser(userId) {
+          requestedUserIds.push(`trend:${userId}`);
+          return userId === "user-b" ? [userBSnapshot] : [];
+        },
+      },
+    },
+  );
+
+  assert.deepEqual(requestedUserIds.sort(), ["latest:user-b:1", "trend:user-b"]);
+  assert.equal(summary.latestSnapshot?.id, "snapshot-user-b");
+  assert.equal(summary.sidebarSummary.netWorth, "800.00");
 });
 
 test("buildDashboardSummary summarizes the latest snapshot for the homepage", () => {

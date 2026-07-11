@@ -65,6 +65,28 @@ const holdingRepository = createHoldingRepository();
 const liabilityRepository = createLiabilityRepository();
 const priceRecordRepository = createPriceRecordRepository();
 
+type ValuationRepositories = {
+  accountRepository: {
+    listByUser(userId: string): PromiseLike<Account[]>;
+  };
+  holdingRepository: {
+    listByUser(userId: string): PromiseLike<HoldingWithRelations[]>;
+  };
+  liabilityRepository: {
+    listByUser(userId: string): PromiseLike<LiabilityWithPaymentAccount[]>;
+  };
+  priceRecordRepository: {
+    listLatestByUser(userId: string): PromiseLike<PriceRecordWithAsset[]>;
+  };
+};
+
+const defaultValuationRepositories = {
+  accountRepository,
+  holdingRepository,
+  liabilityRepository,
+  priceRecordRepository,
+} satisfies ValuationRepositories;
+
 function toDecimal(value: Prisma.Decimal.Value) {
   return new Prisma.Decimal(value);
 }
@@ -136,12 +158,13 @@ function resolveFxRate(
 export async function createValuationPreviewForUser(
   userId: string,
   fxRates?: Record<string, string | number>,
+  repositories: ValuationRepositories = defaultValuationRepositories,
 ) {
   const [accounts, holdings, liabilities, latestPriceRecords] = await Promise.all([
-    accountRepository.listByUser(userId),
-    holdingRepository.listByUser(userId),
-    liabilityRepository.listByUser(userId),
-    priceRecordRepository.listLatestByUser(userId),
+    repositories.accountRepository.listByUser(userId),
+    repositories.holdingRepository.listByUser(userId),
+    repositories.liabilityRepository.listByUser(userId),
+    repositories.priceRecordRepository.listLatestByUser(userId),
   ]);
 
   return buildValuationPreview({
@@ -153,12 +176,15 @@ export async function createValuationPreviewForUser(
   });
 }
 
-export async function createValuationContextForUser(userId: string) {
+export async function createValuationContextForUser(
+  userId: string,
+  repositories: ValuationRepositories = defaultValuationRepositories,
+) {
   const [accounts, holdings, liabilities, latestPriceRecords] = await Promise.all([
-    accountRepository.listByUser(userId),
-    holdingRepository.listByUser(userId),
-    liabilityRepository.listByUser(userId),
-    priceRecordRepository.listLatestByUser(userId),
+    repositories.accountRepository.listByUser(userId),
+    repositories.holdingRepository.listByUser(userId),
+    repositories.liabilityRepository.listByUser(userId),
+    repositories.priceRecordRepository.listLatestByUser(userId),
   ]);
 
   return buildValuationContext({

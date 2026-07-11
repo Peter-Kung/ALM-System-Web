@@ -10,7 +10,7 @@ import {
   Prisma,
 } from "@prisma/client";
 
-import { buildValuationPreview } from "./service";
+import { buildValuationPreview, createValuationPreviewForUser } from "./service";
 import { buildValuationContext, collectRequiredFxCurrencies } from "./service";
 import { fetchFxRateToBase } from "./fx-rates";
 
@@ -108,6 +108,140 @@ test("buildValuationPreview returns a complete preview when prices and FX rates 
   assert.deepEqual(preview.issues, []);
   assert.equal(preview.previewInput.fxRates.length, 2);
   assert.equal(preview.previewInput.holdings[0]?.priceAmount, "10");
+});
+
+test("createValuationPreviewForUser scopes every financial record query to the signed-in user", async () => {
+  const requestedUserIds: string[] = [];
+  const userBAccount = {
+    id: "account-user-b",
+    userId: "user-b",
+    name: "User B Cash",
+    institutionName: "Bank B",
+    accountType: AccountType.BANK,
+    currency: "TWD",
+    cashBalance: new Prisma.Decimal("300"),
+    isActive: true,
+    notes: null,
+    createdAt: new Date("2026-07-07T00:00:00Z"),
+    updatedAt: new Date("2026-07-07T00:00:00Z"),
+  };
+  const userBAsset = {
+    id: "asset-user-b",
+    name: "User B ETF",
+    assetType: AssetType.ETF,
+    symbol: "B",
+    currency: "TWD",
+    isActive: true,
+  };
+
+  const preview = await createValuationPreviewForUser(
+    "user-b",
+    undefined,
+    {
+      accountRepository: {
+        async listByUser(userId) {
+          requestedUserIds.push(`accounts:${userId}`);
+          return userId === "user-b" ? [userBAccount] : [];
+        },
+      },
+      holdingRepository: {
+        async listByUser(userId) {
+          requestedUserIds.push(`holdings:${userId}`);
+          return userId === "user-b"
+            ? [
+                {
+                  id: "holding-user-b",
+                  accountId: userBAccount.id,
+                  assetId: userBAsset.id,
+                  quantity: new Prisma.Decimal("2"),
+                  isActive: true,
+                  notes: null,
+                  createdAt: new Date("2026-07-07T00:00:00Z"),
+                  updatedAt: new Date("2026-07-07T00:00:00Z"),
+                  account: {
+                    id: userBAccount.id,
+                    name: userBAccount.name,
+                    institutionName: userBAccount.institutionName,
+                    currency: userBAccount.currency,
+                    isActive: true,
+                  },
+                  asset: userBAsset,
+                },
+              ]
+            : [];
+        },
+      },
+      liabilityRepository: {
+        async listByUser(userId) {
+          requestedUserIds.push(`liabilities:${userId}`);
+          return userId === "user-b"
+            ? [
+                {
+                  id: "liability-user-b",
+                  userId: "user-b",
+                  name: "User B Loan",
+                  liabilityType: LiabilityType.PERSONAL_LOAN,
+                  currency: "TWD",
+                  originalAmount: new Prisma.Decimal("100"),
+                  currentBalance: new Prisma.Decimal("40"),
+                  interestRate: new Prisma.Decimal("2"),
+                  monthlyPayment: new Prisma.Decimal("5"),
+                  startDate: new Date("2026-01-01T00:00:00Z"),
+                  endDate: null,
+                  paymentAccountId: null,
+                  isActive: true,
+                  notes: null,
+                  createdAt: new Date("2026-07-07T00:00:00Z"),
+                  updatedAt: new Date("2026-07-07T00:00:00Z"),
+                  paymentAccount: null,
+                },
+              ]
+            : [];
+        },
+      },
+      priceRecordRepository: {
+        async listLatestByUser(userId) {
+          requestedUserIds.push(`prices:${userId}`);
+          return userId === "user-b"
+            ? [
+                {
+                  id: "price-user-b",
+                  assetId: userBAsset.id,
+                  sourceType: PriceRecordSourceType.MANUAL_ENTRY,
+                  currency: "TWD",
+                  price: new Prisma.Decimal("50"),
+                  recordedAt: new Date("2026-07-07T00:00:00Z"),
+                  isValid: true,
+                  createdAt: new Date("2026-07-07T00:00:00Z"),
+                  asset: { id: userBAsset.id },
+                },
+              ]
+            : [];
+        },
+      },
+    },
+  );
+
+  assert.deepEqual(requestedUserIds.sort(), [
+    "accounts:user-b",
+    "holdings:user-b",
+    "liabilities:user-b",
+    "prices:user-b",
+  ]);
+  assert.deepEqual(
+    preview.previewInput.accounts.map((account) => account.sourceAccountId),
+    ["account-user-b"],
+  );
+  assert.deepEqual(
+    preview.previewInput.holdings.map((holding) => holding.sourceAssetId),
+    ["asset-user-b"],
+  );
+  assert.deepEqual(
+    preview.previewInput.liabilities.map((liability) => liability.sourceLiabilityId),
+    ["liability-user-b"],
+  );
+  assert.equal(preview.totalAssets, "400.00");
+  assert.equal(preview.totalLiabilities, "40.00");
 });
 
 test("buildValuationPreview preserves real estate asset classification", () => {

@@ -130,6 +130,23 @@ const snapshotRepository = createSnapshotRepository();
 const DASHBOARD_TREND_HISTORY_DAYS = 370;
 const DASHBOARD_TREND_SERIES_DAYS = 10;
 
+type DashboardRepositories = {
+  snapshotRepository: {
+    listByUser(
+      userId: string,
+      options?: { take?: number },
+    ): PromiseLike<DashboardSnapshot[]>;
+    listTrendByUser(
+      userId: string,
+      options?: { since?: Date },
+    ): PromiseLike<DashboardTrendSnapshot[]>;
+  };
+};
+
+const defaultDashboardRepositories = {
+  snapshotRepository,
+} satisfies DashboardRepositories;
+
 function toDecimal(value: Prisma.Decimal.Value) {
   return new Prisma.Decimal(value);
 }
@@ -524,8 +541,11 @@ export function buildDashboardSummary(
 export async function createDashboardSummaryForUser(
   userId: string,
   options: DashboardSummaryOptions = {},
+  repositories: DashboardRepositories = defaultDashboardRepositories,
 ) {
-  const [latestSnapshot] = await snapshotRepository.listByUser(userId, { take: 1 });
+  const [latestSnapshot] = await repositories.snapshotRepository.listByUser(userId, {
+    take: 1,
+  });
 
   if (!latestSnapshot) {
     return buildDashboardSummaryFromParts(undefined, [], options);
@@ -537,7 +557,7 @@ export async function createDashboardSummaryForUser(
       -(DASHBOARD_TREND_HISTORY_DAYS - 1),
     )}T00:00:00.000Z`,
   );
-  const trendSnapshots = await snapshotRepository.listTrendByUser(userId, {
+  const trendSnapshots = await repositories.snapshotRepository.listTrendByUser(userId, {
     since: trendSince,
   });
 
