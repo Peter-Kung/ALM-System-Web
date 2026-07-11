@@ -11,6 +11,7 @@ import {
 const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
 
 export type CreateManagedUserInput = {
+  displayName?: string | null;
   isActive: boolean;
   role: UserRole;
   username: string;
@@ -33,14 +34,35 @@ function validateUsername(username: string) {
   }
 }
 
+function normalizeDisplayName(displayName: string | null | undefined) {
+  const normalizedDisplayName = displayName?.trim();
+  return normalizedDisplayName ? normalizedDisplayName : null;
+}
+
+function validateDisplayName(displayName: string | null) {
+  if (displayName && displayName.length > 64) {
+    throw new RepositoryValidationError("Display name must be 64 characters or fewer.");
+  }
+}
+
 function serializeUser(user: ManagedUser) {
   return {
     id: user.id,
     username: user.username,
+    displayName: user.displayName,
     role: user.role,
     isActive: user.isActive,
     sessionVersion: user.sessionVersion,
+    loginLockout: {
+      failedAttempts: user.failedLoginAttempts,
+      lockedUntil: user.lockedUntil?.toISOString() ?? null,
+    },
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+    telegramBinding: {
+      state: user.telegramBoundAt ? ("BOUND" as const) : ("UNBOUND" as const),
+      telegramUsername: user.telegramUsername,
+      boundAt: user.telegramBoundAt?.toISOString() ?? null,
+    },
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };
@@ -88,12 +110,15 @@ export async function createManagedUser(
   repository: UserManagementRepository = createUserManagementRepository(),
 ) {
   const username = normalizeUsername(input.username);
+  const displayName = normalizeDisplayName(input.displayName);
   validateUsername(username);
+  validateDisplayName(displayName);
   await ensureUsernameAvailable(repository, username);
 
   try {
     const user = await repository.create({
       username,
+      displayName,
       role: input.role,
       isActive: input.isActive,
     });
@@ -174,6 +199,32 @@ export async function requestManagedUserActivation(
   return {
     user: serializeUser(user),
     delivery: "pending_self_managed_onboarding" as const,
+    expiresAt: actionToken.expiresAt.toISOString(),
+    tokenType: actionToken.tokenType,
+  };
+}
+
+export async function requestManagedUserTelegramBindingCode(
+  userId: string,
+  repository: UserManagementRepository = createUserManagementRepository(),
+  now: Date = new Date(),
+) {
+  const user = await repository.findById(userId);
+  if (!user) {
+    throw new RepositoryValidationError("User was not found.");
+  }
+
+  const actionToken = await issueUserActionToken(
+    user.id,
+    "TELEGRAM_BINDING",
+    repository,
+    now,
+  );
+
+  return {
+    user: serializeUser(user),
+    bindingCode: actionToken.token,
+    delivery: "share_with_user" as const,
     expiresAt: actionToken.expiresAt.toISOString(),
     tokenType: actionToken.tokenType,
   };

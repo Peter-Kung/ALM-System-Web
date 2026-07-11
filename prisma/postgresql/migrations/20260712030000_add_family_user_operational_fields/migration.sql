@@ -1,0 +1,6 @@
+ALTER TABLE "User" ADD COLUMN "displayName" TEXT;
+ALTER TABLE "User" ADD COLUMN "failedLoginAttempts" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "User" ADD COLUMN "lockedUntil" TIMESTAMP(3);
+ALTER TABLE "User" ADD COLUMN "telegramChatId" TEXT;
+ALTER TABLE "User" ADD COLUMN "telegramUsername" TEXT;
+ALTER TABLE "User" ADD COLUMN "telegramBoundAt" TIMESTAMP(3);

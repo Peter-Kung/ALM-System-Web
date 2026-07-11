@@ -11,16 +11,22 @@ import {
 import { updateUserHandler } from "@/app/api/admin/users/[userId]/handler";
 import { requestUserActivationHandler } from "@/app/api/admin/users/[userId]/activation-request/handler";
 import { requestUserPasswordResetHandler } from "@/app/api/admin/users/[userId]/password-reset-request/handler";
+import { requestUserTelegramBindingCodeHandler } from "@/app/api/admin/users/[userId]/telegram-binding-code/handler";
 import type { ManagedUser, UserManagementRepository } from "@/modules/users";
 
 function createManagedUserFixture(overrides: Partial<ManagedUser>): ManagedUser {
   return {
     id: "user-1",
     username: "owner",
+    displayName: null,
     role: "ADMIN",
     isActive: true,
     sessionVersion: 0,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     lastLoginAt: null,
+    telegramUsername: null,
+    telegramBoundAt: null,
     createdAt: new Date("2026-07-01T00:00:00Z"),
     updatedAt: new Date("2026-07-01T00:00:00Z"),
     ...overrides,
@@ -65,6 +71,7 @@ function createRepositoryFixture(): UserManagementRepository {
       return users.filter((user) => user.role === "ADMIN" && user.isActive).length;
     },
     async create(data: {
+      displayName?: string | null;
       isActive: boolean;
       role: "ADMIN" | "USER";
       username: string;
@@ -72,6 +79,7 @@ function createRepositoryFixture(): UserManagementRepository {
       const user = createManagedUserFixture({
         id: `user-${users.length + 1}`,
         username: data.username,
+        displayName: data.displayName,
         role: data.role,
         isActive: data.isActive,
       });
@@ -178,6 +186,21 @@ function createRepositoryFixture(): UserManagementRepository {
         user.isActive = data.isActive;
       }
 
+      if (typeof data.displayName === "string" || data.displayName === null) {
+        user.displayName = data.displayName;
+      }
+
+      if (typeof data.telegramUsername === "string" || data.telegramUsername === null) {
+        user.telegramUsername = data.telegramUsername;
+      }
+
+      if (
+        typeof data.telegramBoundAt === "object" &&
+        data.telegramBoundAt instanceof Date
+      ) {
+        user.telegramBoundAt = data.telegramBoundAt;
+      }
+
       if (
         typeof data.sessionVersion === "object" &&
         data.sessionVersion &&
@@ -254,6 +277,7 @@ test("createUserHandler creates users for admin sessions", async () => {
       method: "POST",
       body: JSON.stringify({
         username: "family",
+        displayName: "Family Member",
         role: "USER",
         isActive: false,
       }),
@@ -275,7 +299,9 @@ test("createUserHandler creates users for admin sessions", async () => {
   );
 
   assert.equal(response.status, 201);
-  assert.equal((await response.json()).user.username, "family");
+  const body = await response.json();
+  assert.equal(body.user.username, "family");
+  assert.equal(body.user.displayName, "Family Member");
 });
 
 test("updateUserHandler rejects admin-set passwords", async () => {
@@ -401,8 +427,13 @@ test("requestUserPasswordResetHandler returns no usable password", async () => {
   const repository = createRepositoryFixture();
   await repository.create({
     username: "family",
+    displayName: "Family Member",
     role: "USER",
     isActive: true,
+  });
+  await repository.update("user-2", {
+    telegramBoundAt: new Date("2026-07-11T00:00:00Z"),
+    telegramUsername: "family_member",
   });
 
   const response = await requestUserPasswordResetHandler("user-2", {
@@ -424,6 +455,7 @@ test("requestUserPasswordResetHandler returns no usable password", async () => {
   const body = await response.json();
   assert.equal(body.delivery, "pending_self_managed_onboarding");
   assert.equal(body.user.username, "family");
+  assert.equal(body.user.displayName, "Family Member");
   assert.equal(body.tokenType, "PASSWORD_RESET");
   assert.equal(typeof body.expiresAt, "string");
   assert.equal("password" in body, false);
@@ -457,4 +489,36 @@ test("requestUserActivationHandler rejects already active users", async () => {
   assert.deepEqual(await response.json(), {
     error: "Activation links are only available for inactive users.",
   });
+});
+
+test("requestUserTelegramBindingCodeHandler returns a short-lived binding code", async () => {
+  const repository = createRepositoryFixture();
+  await repository.create({
+    username: "family",
+    displayName: "Family Member",
+    role: "USER",
+    isActive: false,
+  });
+
+  const response = await requestUserTelegramBindingCodeHandler("user-2", {
+    createRepository: () => repository,
+    async requireSession() {
+      return {
+        response: null,
+        session: {
+          sub: "admin-user",
+          username: "admin",
+          role: "ADMIN",
+          sessionVersion: 0,
+        },
+      };
+    },
+  });
+
+  assert.equal(response.status, 202);
+  const body = await response.json();
+  assert.equal(body.delivery, "share_with_user");
+  assert.equal(body.tokenType, "TELEGRAM_BINDING");
+  assert.equal(body.user.displayName, "Family Member");
+  assert.equal(typeof body.bindingCode, "string");
 });

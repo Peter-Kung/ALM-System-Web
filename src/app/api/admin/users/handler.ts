@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   getBooleanValue,
   getEnumValue,
+  getNullableStringValue,
   getStringValue,
   handleRouteError,
   readJsonBody,
@@ -81,6 +82,7 @@ export async function createUserHandler(
 
     const user = await createManagedUser(
       {
+        displayName: getNullableStringValue(payload, "displayName"),
         username: getStringValue(payload, "username"),
         role: getEnumValue(payload, "role", Object.values(UserRole)),
         isActive: getBooleanValue(payload, "isActive"),

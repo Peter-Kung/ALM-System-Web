@@ -83,11 +83,17 @@ enum UserActionTokenType {
 model User {
   id             String      @id @default(cuid())
   username       String      @unique
+  displayName    String?
   passwordHash   String?
   role           UserRole    @default(ADMIN)
   isActive       Boolean     @default(true)
   sessionVersion Int         @default(0)
+  failedLoginAttempts Int    @default(0)
+  lockedUntil    DateTime?
   lastLoginAt    DateTime?
+  telegramChatId String?
+  telegramUsername String?
+  telegramBoundAt DateTime?
   bootstrapKey   String?     @unique
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt

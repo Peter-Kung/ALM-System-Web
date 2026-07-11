@@ -7,10 +7,15 @@ export type ManagedUser = Pick<
   User,
   | "id"
   | "username"
+  | "displayName"
   | "role"
   | "isActive"
   | "sessionVersion"
+  | "failedLoginAttempts"
+  | "lockedUntil"
   | "lastLoginAt"
+  | "telegramUsername"
+  | "telegramBoundAt"
   | "createdAt"
   | "updatedAt"
 >;
@@ -31,10 +36,15 @@ export type ManagedUserActionToken = Pick<
 const managedUserSelect = {
   id: true,
   username: true,
+  displayName: true,
   role: true,
   isActive: true,
   sessionVersion: true,
+  failedLoginAttempts: true,
+  lockedUntil: true,
   lastLoginAt: true,
+  telegramUsername: true,
+  telegramBoundAt: true,
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
@@ -54,6 +64,7 @@ const managedUserActionTokenSelect = {
 export type UserManagementRepository = {
   countActiveAdmins(): Promise<number>;
   create(data: {
+    displayName?: string | null;
     isActive: boolean;
     role: "ADMIN" | "USER";
     username: string;
@@ -97,6 +108,7 @@ export function createUserManagementRepository(
       });
     },
     create(data: {
+      displayName?: string | null;
       isActive: boolean;
       role: "ADMIN" | "USER";
       username: string;
@@ -104,6 +116,7 @@ export function createUserManagementRepository(
       return db.user.create({
         data: {
           username: data.username,
+          displayName: data.displayName,
           role: data.role,
           isActive: data.isActive,
           passwordHash: null,

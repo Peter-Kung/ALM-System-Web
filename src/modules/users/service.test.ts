@@ -10,6 +10,7 @@ import {
   listManagedUsers,
   requestManagedUserActivation,
   requestManagedUserPasswordReset,
+  requestManagedUserTelegramBindingCode,
   updateManagedUser,
 } from "@/modules/users/service";
 
@@ -17,10 +18,15 @@ function createManagedUserFixture(overrides: Partial<ManagedUser>): ManagedUser 
   return {
     id: "user-1",
     username: "owner",
+    displayName: null,
     role: "ADMIN",
     isActive: true,
     sessionVersion: 0,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     lastLoginAt: null,
+    telegramUsername: null,
+    telegramBoundAt: null,
     createdAt: new Date("2026-07-01T00:00:00Z"),
     updatedAt: new Date("2026-07-01T00:00:00Z"),
     ...overrides,
@@ -68,6 +74,7 @@ function createRepositoryFixture(
       return users.filter((user) => user.role === "ADMIN" && user.isActive).length;
     },
     async create(data: {
+      displayName?: string | null;
       isActive: boolean;
       role: "ADMIN" | "USER";
       username: string;
@@ -75,6 +82,7 @@ function createRepositoryFixture(
       const user = createManagedUserFixture({
         id: `user-${users.length + 1}`,
         username: data.username,
+        displayName: data.displayName,
         role: data.role,
         isActive: data.isActive,
         createdAt: new Date(`2026-07-0${users.length + 1}T00:00:00Z`),
@@ -190,6 +198,21 @@ function createRepositoryFixture(
         user.isActive = data.isActive;
       }
 
+      if (typeof data.displayName === "string" || data.displayName === null) {
+        user.displayName = data.displayName;
+      }
+
+      if (typeof data.telegramUsername === "string" || data.telegramUsername === null) {
+        user.telegramUsername = data.telegramUsername;
+      }
+
+      if (
+        typeof data.telegramBoundAt === "object" &&
+        data.telegramBoundAt instanceof Date
+      ) {
+        user.telegramBoundAt = data.telegramBoundAt;
+      }
+
       if (
         typeof data.sessionVersion === "object" &&
         data.sessionVersion &&
@@ -222,10 +245,20 @@ test("listManagedUsers returns admin-safe user fields", async () => {
     {
       id: "admin-user",
       username: "admin",
+      displayName: null,
       role: "ADMIN",
       isActive: true,
       sessionVersion: 0,
+      loginLockout: {
+        failedAttempts: 0,
+        lockedUntil: null,
+      },
       lastLoginAt: "2026-07-08T00:00:00.000Z",
+      telegramBinding: {
+        state: "UNBOUND",
+        telegramUsername: null,
+        boundAt: null,
+      },
       createdAt: "2026-07-01T00:00:00.000Z",
       updatedAt: "2026-07-01T00:00:00.000Z",
     },
@@ -245,8 +278,25 @@ test("createManagedUser creates a user without a password", async () => {
   );
 
   assert.equal(user.username, "family.user");
+  assert.equal(user.displayName, null);
   assert.equal(user.role, "USER");
   assert.equal(user.isActive, false);
+});
+
+test("createManagedUser stores a trimmed display name", async () => {
+  const repository = createRepositoryFixture();
+
+  const user = await createManagedUser(
+    {
+      username: "family.user",
+      displayName: "  Family Member  ",
+      role: "USER",
+      isActive: true,
+    },
+    repository,
+  );
+
+  assert.equal(user.displayName, "Family Member");
 });
 
 test("createManagedUser rejects duplicate usernames", async () => {
@@ -365,6 +415,8 @@ test("requestManagedUserPasswordReset does not return a password", async () => {
       id: "family-user",
       username: "family",
       role: "USER",
+      telegramBoundAt: new Date("2026-07-11T00:00:00Z"),
+      telegramUsername: "family_member",
     },
   ]);
 
@@ -378,10 +430,20 @@ test("requestManagedUserPasswordReset does not return a password", async () => {
       user: {
         id: "family-user",
         username: "family",
+        displayName: null,
         role: "USER",
         isActive: true,
         sessionVersion: 0,
+        loginLockout: {
+          failedAttempts: 0,
+          lockedUntil: null,
+        },
         lastLoginAt: null,
+        telegramBinding: {
+          state: "BOUND",
+          telegramUsername: "family_member",
+          boundAt: "2026-07-11T00:00:00.000Z",
+        },
         createdAt: "2026-07-01T00:00:00.000Z",
         updatedAt: "2026-07-01T00:00:00.000Z",
       },
@@ -399,6 +461,8 @@ test("requestManagedUserActivation returns activation metadata without a usable 
       username: "family",
       role: "USER",
       isActive: false,
+      telegramBoundAt: new Date("2026-07-11T00:00:00Z"),
+      telegramUsername: "family_member",
     },
   ]);
 
@@ -412,10 +476,20 @@ test("requestManagedUserActivation returns activation metadata without a usable 
       user: {
         id: "family-user",
         username: "family",
+        displayName: null,
         role: "USER",
         isActive: false,
         sessionVersion: 0,
+        loginLockout: {
+          failedAttempts: 0,
+          lockedUntil: null,
+        },
         lastLoginAt: null,
+        telegramBinding: {
+          state: "BOUND",
+          telegramUsername: "family_member",
+          boundAt: "2026-07-11T00:00:00.000Z",
+        },
         createdAt: "2026-07-01T00:00:00.000Z",
         updatedAt: "2026-07-01T00:00:00.000Z",
       },
@@ -424,6 +498,28 @@ test("requestManagedUserActivation returns activation metadata without a usable 
       tokenType: "ACCOUNT_ACTIVATION",
     },
   );
+});
+
+test("requestManagedUserTelegramBindingCode returns a short-lived code", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "family-user",
+      username: "family",
+      role: "USER",
+    },
+  ]);
+
+  const response = await requestManagedUserTelegramBindingCode(
+    "family-user",
+    repository,
+    new Date("2026-07-11T00:00:00Z"),
+  );
+
+  assert.equal(response.user.username, "family");
+  assert.equal(response.delivery, "share_with_user");
+  assert.equal(response.tokenType, "TELEGRAM_BINDING");
+  assert.equal(typeof response.bindingCode, "string");
+  assert.equal(response.expiresAt, "2026-07-11T00:05:00.000Z");
 });
 
 test("requestManagedUserActivation rejects already active users", async () => {
