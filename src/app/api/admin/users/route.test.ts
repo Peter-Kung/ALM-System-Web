@@ -429,3 +429,32 @@ test("requestUserPasswordResetHandler returns no usable password", async () => {
   assert.equal("password" in body, false);
   assert.equal("temporaryPassword" in body, false);
 });
+
+test("requestUserActivationHandler rejects already active users", async () => {
+  const repository = createRepositoryFixture();
+  await repository.create({
+    username: "family",
+    role: "USER",
+    isActive: true,
+  });
+
+  const response = await requestUserActivationHandler("user-2", {
+    createRepository: () => repository,
+    async requireSession() {
+      return {
+        response: null,
+        session: {
+          sub: "admin-user",
+          username: "admin",
+          role: "ADMIN",
+          sessionVersion: 0,
+        },
+      };
+    },
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: "Activation links are only available for inactive users.",
+  });
+});

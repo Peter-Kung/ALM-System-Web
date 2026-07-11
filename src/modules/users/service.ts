@@ -158,6 +158,12 @@ export async function requestManagedUserActivation(
     throw new RepositoryValidationError("User was not found.");
   }
 
+  if (user.isActive) {
+    throw new RepositoryValidationError(
+      "Activation links are only available for inactive users.",
+    );
+  }
+
   const actionToken = await issueUserActionToken(
     user.id,
     "ACCOUNT_ACTIVATION",

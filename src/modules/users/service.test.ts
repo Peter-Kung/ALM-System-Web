@@ -425,3 +425,26 @@ test("requestManagedUserActivation returns activation metadata without a usable 
     },
   );
 });
+
+test("requestManagedUserActivation rejects already active users", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "family-user",
+      username: "family",
+      role: "USER",
+      isActive: true,
+    },
+  ]);
+
+  await assert.rejects(
+    () =>
+      requestManagedUserActivation(
+        "family-user",
+        repository,
+        new Date("2026-07-11T00:00:00Z"),
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message === "Activation links are only available for inactive users.",
+  );
+});

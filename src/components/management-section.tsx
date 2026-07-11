@@ -628,26 +628,29 @@ function UserRecordCard({
         </label>
       </div>
       <div className="account-card-actions">
-        <button
-          type="button"
-          className="ghost-button compact-button"
-          disabled={requestingUserId === activationRequestId}
-          onClick={onRequestActivation}
-        >
-          {requestingUserId === activationRequestId
-            ? "Requesting..."
-            : "Request activation"}
-        </button>
-        <button
-          type="button"
-          className="ghost-button compact-button"
-          disabled={requestingUserId === passwordResetRequestId}
-          onClick={onRequestPasswordReset}
-        >
-          {requestingUserId === passwordResetRequestId
-            ? "Requesting..."
-            : "Request password reset"}
-        </button>
+        {user.isActive ? (
+          <button
+            type="button"
+            className="ghost-button compact-button"
+            disabled={requestingUserId === passwordResetRequestId}
+            onClick={onRequestPasswordReset}
+          >
+            {requestingUserId === passwordResetRequestId
+              ? "Requesting..."
+              : "Request password reset"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ghost-button compact-button"
+            disabled={requestingUserId === activationRequestId}
+            onClick={onRequestActivation}
+          >
+            {requestingUserId === activationRequestId
+              ? "Requesting..."
+              : "Request activation"}
+          </button>
+        )}
       </div>
     </article>
   );

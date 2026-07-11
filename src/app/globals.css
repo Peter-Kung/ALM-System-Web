@@ -450,6 +450,11 @@ button:disabled {
   margin: 0;
 }
 
+.inline-link {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
 .management-grid {
   display: grid;
   gap: 1.5rem;

@@ -7,6 +7,7 @@ import type { AuthRepository, AuthUser } from "@/modules/auth/repository";
 import type { UserActionTokenRepository } from "@/modules/auth/action-token";
 import { RepositoryValidationError } from "@/lib/repository-utils";
 import {
+  completeSelfManagedPassword,
   consumeUserActionToken,
   createFirstAdministrator,
   ensureConfiguredAdministrator,
@@ -16,6 +17,7 @@ import {
   issueUserActionToken,
   updateAccountCredentials,
   validateUserActionToken,
+  readSelfManagedPasswordLink,
   validateOwnerLogin,
   validateSessionPayload,
   verifyPassword,
@@ -876,5 +878,215 @@ test("validateUserActionToken rejects expired tokens and expireUserActionTokens 
   assert.equal(
     await expireUserActionTokens(repository, new Date("2026-07-10T12:05:01Z")),
     1,
+  );
+});
+
+test("readSelfManagedPasswordLink returns activation metadata for valid tokens", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "family",
+      isActive: false,
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const issuedToken = await issueUserActionToken(
+    "user-1",
+    "ACCOUNT_ACTIVATION",
+    repository,
+    new Date("2026-07-10T12:00:00Z"),
+  );
+
+  const link = await readSelfManagedPasswordLink(
+    issuedToken.token,
+    "ACCOUNT_ACTIVATION",
+    repository,
+    new Date("2026-07-10T12:03:00Z"),
+  );
+
+  assert.deepEqual(link, {
+    userId: "user-1",
+    username: "family",
+    tokenType: "ACCOUNT_ACTIVATION",
+    expiresAt: new Date("2026-07-10T12:05:00.000Z"),
+  });
+});
+
+test("readSelfManagedPasswordLink rejects activation tokens for active users", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "family",
+      isActive: true,
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const issuedToken = await issueUserActionToken(
+    "user-1",
+    "ACCOUNT_ACTIVATION",
+    repository,
+    new Date("2026-07-10T12:00:00Z"),
+  );
+
+  assert.equal(
+    await readSelfManagedPasswordLink(
+      issuedToken.token,
+      "ACCOUNT_ACTIVATION",
+      repository,
+      new Date("2026-07-10T12:03:00Z"),
+    ),
+    null,
+  );
+});
+
+test("completeSelfManagedPassword activates users and consumes one-time tokens", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "family",
+      isActive: false,
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const issuedToken = await issueUserActionToken(
+    "user-1",
+    "ACCOUNT_ACTIVATION",
+    repository,
+    new Date("2026-07-10T12:00:00Z"),
+  );
+
+  const updatedUser = await completeSelfManagedPassword(
+    {
+      token: issuedToken.token,
+      password: "family-password",
+      confirmPassword: "family-password",
+      tokenType: "ACCOUNT_ACTIVATION",
+    },
+    repository,
+    new Date("2026-07-10T12:03:00Z"),
+  );
+
+  assert.equal(updatedUser.isActive, true);
+  assert.ok(updatedUser.passwordHash);
+  assert.equal(await verifyPassword("family-password", updatedUser.passwordHash), true);
+  assert.equal(
+    await readSelfManagedPasswordLink(
+      issuedToken.token,
+      "ACCOUNT_ACTIVATION",
+      repository,
+      new Date("2026-07-10T12:03:01Z"),
+    ),
+    null,
+  );
+});
+
+test("completeSelfManagedPassword invalidates older sessions for password resets", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "family",
+      isActive: true,
+      sessionVersion: 3,
+      passwordHash: await hashPassword("old-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const issuedToken = await issueUserActionToken(
+    "user-1",
+    "PASSWORD_RESET",
+    repository,
+    new Date("2026-07-10T12:00:00Z"),
+  );
+
+  const updatedUser = await completeSelfManagedPassword(
+    {
+      token: issuedToken.token,
+      password: "new-password",
+      confirmPassword: "new-password",
+      tokenType: "PASSWORD_RESET",
+    },
+    repository,
+    new Date("2026-07-10T12:03:00Z"),
+  );
+
+  assert.equal(updatedUser.isActive, true);
+  assert.equal(updatedUser.sessionVersion, 4);
+  assert.ok(updatedUser.passwordHash);
+  assert.equal(await verifyPassword("new-password", updatedUser.passwordHash), true);
+});
+
+test("completeSelfManagedPassword rejects reset links for inactive users", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "family",
+      isActive: false,
+      passwordHash: await hashPassword("old-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const issuedToken = await issueUserActionToken(
+    "user-1",
+    "PASSWORD_RESET",
+    repository,
+    new Date("2026-07-10T12:00:00Z"),
+  );
+
+  await assert.rejects(
+    () =>
+      completeSelfManagedPassword(
+        {
+          token: issuedToken.token,
+          password: "new-password",
+          confirmPassword: "new-password",
+          tokenType: "PASSWORD_RESET",
+        },
+        repository,
+        new Date("2026-07-10T12:03:00Z"),
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message === "That link is invalid or expired.",
+  );
+});
+
+test("completeSelfManagedPassword rejects activation links for active users", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "family",
+      isActive: true,
+      passwordHash: await hashPassword("old-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const issuedToken = await issueUserActionToken(
+    "user-1",
+    "ACCOUNT_ACTIVATION",
+    repository,
+    new Date("2026-07-10T12:00:00Z"),
+  );
+
+  await assert.rejects(
+    () =>
+      completeSelfManagedPassword(
+        {
+          token: issuedToken.token,
+          password: "new-password",
+          confirmPassword: "new-password",
+          tokenType: "ACCOUNT_ACTIVATION",
+        },
+        repository,
+        new Date("2026-07-10T12:03:00Z"),
+      ),
+    (error: unknown) =>
+      error instanceof RepositoryValidationError &&
+      error.message === "That link is invalid or expired.",
   );
 });

@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import { Prisma } from "@prisma/client";
+import type { UserActionTokenType } from "@prisma/client";
 
 import { env, getConfiguredAdminCredentials, requireFixedPassword } from "@/lib/env";
 import type { SessionPayload } from "@/lib/auth/token";
@@ -9,6 +10,11 @@ import {
   type AuthRepository,
   type AuthUser,
 } from "@/modules/auth/repository";
+import {
+  consumeUserActionToken,
+  validateUserActionToken,
+  type UserActionTokenRepository,
+} from "@/modules/auth/action-token";
 
 const PASSWORD_SALT_ROUNDS = 12;
 const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
@@ -28,6 +34,27 @@ export type CreateFirstAdministratorInput = {
 };
 
 export type AuthenticatedUserSession = SessionPayload;
+
+export type SelfManagedPasswordTokenType = Extract<
+  UserActionTokenType,
+  "ACCOUNT_ACTIVATION" | "PASSWORD_RESET"
+>;
+
+export type CompleteSelfManagedPasswordInput = {
+  confirmPassword: string;
+  password: string;
+  token: string;
+  tokenType: SelfManagedPasswordTokenType;
+};
+
+export type SelfManagedPasswordLink = {
+  expiresAt: Date;
+  tokenType: SelfManagedPasswordTokenType;
+  userId: string;
+  username: string;
+};
+
+type SelfManagedPasswordRepository = AuthRepository & UserActionTokenRepository;
 
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
@@ -157,6 +184,14 @@ function validateNextPassword(
   }
 }
 
+function normalizeActionToken(token: string) {
+  return token.trim();
+}
+
+function createInvalidLinkError() {
+  return new RepositoryValidationError("That link is invalid or expired.");
+}
+
 export async function isBootstrapRequired(
   repository: AuthRepository = createAuthRepository(),
 ) {
@@ -213,6 +248,88 @@ export async function validateSessionPayload(
     role: user.role,
     sessionVersion: user.sessionVersion,
   } satisfies AuthenticatedUserSession;
+}
+
+export async function readSelfManagedPasswordLink(
+  token: string,
+  tokenType: SelfManagedPasswordTokenType,
+  repository: SelfManagedPasswordRepository = createAuthRepository(),
+  now: Date = new Date(),
+): Promise<SelfManagedPasswordLink | null> {
+  const normalizedToken = normalizeActionToken(token);
+  if (!normalizedToken) {
+    return null;
+  }
+
+  const actionToken = await validateUserActionToken(
+    normalizedToken,
+    tokenType,
+    repository,
+    now,
+  );
+  if (!actionToken) {
+    return null;
+  }
+
+  const user = await repository.findById(actionToken.userId);
+  if (
+    !user ||
+    (tokenType === "ACCOUNT_ACTIVATION" && user.isActive) ||
+    (tokenType === "PASSWORD_RESET" && !user.isActive)
+  ) {
+    return null;
+  }
+
+  return {
+    userId: user.id,
+    username: user.username,
+    expiresAt: actionToken.expiresAt,
+    tokenType,
+  };
+}
+
+export async function completeSelfManagedPassword(
+  input: CompleteSelfManagedPasswordInput,
+  repository: SelfManagedPasswordRepository = createAuthRepository(),
+  now: Date = new Date(),
+) {
+  validateNextPassword(input.password, input.confirmPassword);
+
+  const normalizedToken = normalizeActionToken(input.token);
+  if (!normalizedToken) {
+    throw createInvalidLinkError();
+  }
+
+  return repository.withTransaction(async (transactionRepository) => {
+    const authRepository = transactionRepository as SelfManagedPasswordRepository;
+
+    const actionLink = await readSelfManagedPasswordLink(
+      normalizedToken,
+      input.tokenType,
+      authRepository,
+      now,
+    );
+    if (!actionLink) {
+      throw createInvalidLinkError();
+    }
+
+    const consumedToken = await consumeUserActionToken(
+      normalizedToken,
+      input.tokenType,
+      authRepository,
+      now,
+    );
+    if (!consumedToken) {
+      throw createInvalidLinkError();
+    }
+
+    return authRepository.update(actionLink.userId, {
+      isActive: input.tokenType === "ACCOUNT_ACTIVATION" ? true : undefined,
+      passwordHash: await hashPassword(input.password),
+      sessionVersion:
+        input.tokenType === "PASSWORD_RESET" ? { increment: 1 } : undefined,
+    });
+  });
 }
 
 async function requireCurrentUser(

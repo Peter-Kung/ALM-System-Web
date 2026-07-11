@@ -256,7 +256,7 @@ test("users management actions show pending self-managed onboarding status", asy
             id: "user-member",
             username: "member",
             role: UserRole.USER,
-            isActive: true,
+            isActive: false,
             sessionVersion: 0,
             lastLoginAt: null,
             createdAt: "2026-07-11T00:00:00.000Z",
@@ -306,6 +306,53 @@ test("users management actions show pending self-managed onboarding status", asy
       /member is waiting for the self-managed onboarding flow; no password was issued\./,
     );
     assert.doesNotMatch(document.body.textContent ?? "", /Activation requested for member/);
+  } finally {
+    globalThis.fetch = previousFetch;
+    await unmount(root);
+    restore();
+  }
+});
+
+test("users management shows password reset only for active users", async () => {
+  const { document, root, restore } = createDom();
+  const previousFetch = globalThis.fetch;
+
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input);
+
+    if (url === "/api/admin/users" && init === undefined) {
+      return Response.json({
+        users: [
+          {
+            id: "user-member",
+            username: "member",
+            role: UserRole.USER,
+            isActive: true,
+            sessionVersion: 0,
+            lastLoginAt: null,
+            createdAt: "2026-07-11T00:00:00.000Z",
+            updatedAt: "2026-07-11T00:00:00.000Z",
+          },
+        ],
+      });
+    }
+
+    throw new Error(`Unexpected fetch request: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    await act(async () => {
+      root.render(
+        <WorkspaceMutationBoundary>
+          <ManagementSection section="users" />
+        </WorkspaceMutationBoundary>,
+      );
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    assert.match(document.body.textContent ?? "", /Request password reset/);
+    assert.doesNotMatch(document.body.textContent ?? "", /Request activation/);
   } finally {
     globalThis.fetch = previousFetch;
     await unmount(root);

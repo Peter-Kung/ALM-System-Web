@@ -26,12 +26,12 @@ export function LoginFormFields({
     <>
       <div className="stack">
         <div>
-          <p className="eyebrow">Owner sign in</p>
+          <p className="eyebrow">Private service sign in</p>
           <h1>Sign in to workspace</h1>
         </div>
         <p className="muted">
-          Use the current owner credentials for this environment. Successful sign-in
-          returns you to the requested route or the dashboard.
+          Sign in with the username and password for this private ALM service.
+          Successful sign-in returns you to the requested route or the dashboard.
         </p>
       </div>
       <input name="next" type="hidden" value={nextPath ?? ""} />

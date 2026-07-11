@@ -16,7 +16,7 @@ test("login page frame renders only the centered auth panel", () => {
     </LoginPageFrame>,
   );
 
-  assert.match(markup, /Owner sign in panel/);
+  assert.match(markup, /Authentication panel/);
   assert.doesNotMatch(markup, /login-hero/);
   assert.doesNotMatch(markup, /Private balance sheet workspace/);
   assert.doesNotMatch(markup, /Snapshot pulse/);
@@ -26,6 +26,7 @@ test("login page frame renders only the centered auth panel", () => {
   assert.match(markup, /autoComplete="username"/);
   assert.match(markup, /name="password"/);
   assert.match(markup, /type="password"/);
+  assert.match(markup, /Private service sign in/);
   assert.match(markup, /<h1>Sign in to workspace<\/h1>/);
 });
 
