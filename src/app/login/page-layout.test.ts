@@ -12,6 +12,10 @@ test("login page keeps the sign-in panel centered in the viewport layout", () =>
   );
   assert.match(globalsCss, /grid-template-areas:\s*"hero panel spacer";/);
   assert.match(globalsCss, /\.login-layout::after\s*{[\s\S]*grid-area:\s*spacer;/);
+  assert.match(
+    globalsCss,
+    /\.login-hero,\s*\.login-panel\s*{[^}]*min-width:\s*0;/,
+  );
   assert.match(globalsCss, /\.login-page\s*{[\s\S]*min-height:\s*100dvh;/);
 });
 
