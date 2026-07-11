@@ -8,10 +8,7 @@ import {
   Tooltip,
 } from "recharts";
 
-import {
-  type DashboardAmountDisplayMode,
-  formatDashboardAmount,
-} from "@/components/dashboard-amount-format";
+import { formatDashboardAmount } from "@/components/dashboard-amount-format";
 import type { DashboardAllocationItem } from "@/modules/dashboard/service";
 
 const ALLOCATION_COLORS = [
@@ -25,13 +22,11 @@ const ALLOCATION_COLORS = [
 type DashboardAllocationCardProps = {
   allocation: DashboardAllocationItem[];
   baseCurrency: string;
-  amountDisplayMode: DashboardAmountDisplayMode;
 };
 
 export function DashboardAllocationCard({
   allocation,
   baseCurrency,
-  amountDisplayMode,
 }: DashboardAllocationCardProps) {
   if (allocation.length === 0) {
     return (
@@ -85,10 +80,7 @@ export function DashboardAllocationCard({
             </Pie>
             <Tooltip
               content={
-                <AllocationTooltip
-                  baseCurrency={baseCurrency}
-                  amountDisplayMode={amountDisplayMode}
-                />
+                <AllocationTooltip baseCurrency={baseCurrency} />
               }
             />
           </PieChart>
@@ -108,7 +100,7 @@ export function DashboardAllocationCard({
                 <div className="dashboard-allocation-legend-row">
                   <strong>{item.label}</strong>
                   <span>
-                    {formatDashboardAmount(item.value, baseCurrency, amountDisplayMode, {
+                    {formatDashboardAmount(item.value, baseCurrency, {
                       currencyPosition: "prefix",
                     })}
                   </span>
@@ -133,14 +125,12 @@ type AllocationTooltipProps = {
     };
   }>;
   baseCurrency: string;
-  amountDisplayMode: DashboardAmountDisplayMode;
 };
 
 function AllocationTooltip({
   active,
   payload,
   baseCurrency,
-  amountDisplayMode,
 }: AllocationTooltipProps) {
   if (!active || !payload?.[0]) {
     return null;
@@ -155,7 +145,7 @@ function AllocationTooltip({
     <div className="dashboard-allocation-tooltip">
       <strong>{label}</strong>
       <div>
-        {formatDashboardAmount(amount, baseCurrency, amountDisplayMode, {
+        {formatDashboardAmount(amount, baseCurrency, {
           currencyPosition: "prefix",
         })}{" "}
         · {share}%

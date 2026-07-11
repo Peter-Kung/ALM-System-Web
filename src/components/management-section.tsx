@@ -13,6 +13,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { SnapshotManager } from "@/components/snapshot-manager";
 import { ValuationManager } from "@/components/valuation-manager";
 import { useWorkspaceMutation } from "@/components/workspace-mutation-boundary";
+import { formatReadOnlyMoney } from "@/lib/read-only-money-format";
 
 export type AccountRecord = {
   id: string;
@@ -653,21 +654,10 @@ function UserRecordCard({
 }
 
 export function formatCurrencyAmount(value: string, currency: string) {
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return `${currency} ${value}`;
-  }
-
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(numericValue);
-  } catch {
-    return `${currency} ${value}`;
-  }
+  return formatReadOnlyMoney(value, {
+    currency,
+    currencyPosition: "prefix",
+  });
 }
 
 export function getAccountActionLabel(
@@ -1892,11 +1882,11 @@ function LiabilitiesManager() {
               <dl className="detail-grid">
                 <div>
                   <dt>Current balance</dt>
-                  <dd>{liability.currentBalance}</dd>
+                  <dd>{formatCurrencyAmount(liability.currentBalance, liability.currency)}</dd>
                 </div>
                 <div>
                   <dt>Monthly payment</dt>
-                  <dd>{liability.monthlyPayment}</dd>
+                  <dd>{formatCurrencyAmount(liability.monthlyPayment, liability.currency)}</dd>
                 </div>
                 <div>
                   <dt>Status</dt>
@@ -2135,9 +2125,7 @@ function PricesManager() {
                         <h3>{entry.assetName}</h3>
                         <p className="muted">{entry.symbol}</p>
                       </div>
-                      <strong>
-                        {entry.price} {entry.currency}
-                      </strong>
+                      <strong>{formatCurrencyAmount(entry.price, entry.currency)}</strong>
                     </div>
                     <p className="muted">Recorded at {formatDateTime(entry.recordedAt)}</p>
                   </article>
@@ -2265,9 +2253,7 @@ function PricesManager() {
                       <dl className="detail-grid">
                         <div>
                           <dt>Latest price</dt>
-                          <dd>
-                            {latestPrice.price} {latestPrice.currency}
-                          </dd>
+                          <dd>{formatCurrencyAmount(latestPrice.price, latestPrice.currency)}</dd>
                         </div>
                         <div>
                           <dt>Recorded</dt>

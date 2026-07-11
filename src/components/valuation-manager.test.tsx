@@ -275,7 +275,7 @@ test("valuation manager submits the visible manual FX override", async () => {
     await flushEffects();
 
     assert.deepEqual(submittedFxRates, [{ USD: "29.75" }]);
-    assert.match(document.body.textContent ?? "", /3125\.00 TWD/);
+    assert.match(document.body.textContent ?? "", /3\.1K TWD/);
   } finally {
     globalThis.fetch = previousFetch;
     await unmount(root);

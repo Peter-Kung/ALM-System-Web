@@ -3,12 +3,7 @@
 import Link from "next/link";
 import React from "react";
 
-import {
-  DASHBOARD_AMOUNT_DISPLAY_STORAGE_KEY,
-  type DashboardAmountDisplayMode,
-  formatDashboardAmount,
-  readDashboardAmountDisplayMode,
-} from "@/components/dashboard-amount-format";
+import { formatDashboardAmount } from "@/components/dashboard-amount-format";
 import { DashboardAllocationCard } from "@/components/dashboard-allocation-card";
 import { DashboardTrendCard } from "@/components/dashboard-trend-card";
 import type { DashboardRoute, DashboardSummary } from "@/modules/dashboard/service";
@@ -18,18 +13,6 @@ type DashboardPageViewProps = {
 };
 
 export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
-  const [amountDisplayMode, setAmountDisplayMode] =
-    React.useState<DashboardAmountDisplayMode>("compact");
-
-  React.useEffect(() => {
-    setAmountDisplayMode(readDashboardAmountDisplayMode(globalThis.localStorage));
-  }, []);
-
-  function changeAmountDisplayMode(mode: DashboardAmountDisplayMode) {
-    setAmountDisplayMode(mode);
-    globalThis.localStorage?.setItem(DASHBOARD_AMOUNT_DISPLAY_STORAGE_KEY, mode);
-  }
-
   if (!dashboard.latestSnapshot) {
     const emptyState = dashboard.emptyState;
 
@@ -104,86 +87,31 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
               the current summary.
             </p>
           </div>
-          <fieldset className="dashboard-amount-control">
-            <legend>Amount display</legend>
-            <div className="dashboard-segmented-control">
-              <button
-                type="button"
-                className={amountDisplayMode === "compact" ? "is-active" : ""}
-                aria-pressed={amountDisplayMode === "compact"}
-                onClick={() => changeAmountDisplayMode("compact")}
-              >
-                Compact
-              </button>
-              <button
-                type="button"
-                className={amountDisplayMode === "full" ? "is-active" : ""}
-                aria-pressed={amountDisplayMode === "full"}
-                onClick={() => changeAmountDisplayMode("full")}
-              >
-                Full
-              </button>
-            </div>
-          </fieldset>
         </article>
       </div>
 
       <div className="dashboard-grid">
         <article className="resource-card stack dashboard-highlight">
           <p className="eyebrow">Net worth</p>
-          <h2>
-            {formatDashboardAmount(
-              snapshot.netWorth,
-              snapshot.baseCurrency,
-              amountDisplayMode,
-            )}
-          </h2>
+          <h2>{formatDashboardAmount(snapshot.netWorth, snapshot.baseCurrency)}</h2>
           <p className="muted">
-            Assets{" "}
-            {formatDashboardAmount(
-              snapshot.totalAssets,
-              snapshot.baseCurrency,
-              amountDisplayMode,
-            )}{" "}
-            · Liabilities{" "}
-            {formatDashboardAmount(
-              snapshot.totalLiabilities,
-              snapshot.baseCurrency,
-              amountDisplayMode,
-            )}
+            Assets {formatDashboardAmount(snapshot.totalAssets, snapshot.baseCurrency)} ·
+            Liabilities {formatDashboardAmount(snapshot.totalLiabilities, snapshot.baseCurrency)}
           </p>
         </article>
         <article className="resource-card stack">
           <p className="eyebrow">Total assets</p>
-          <h2>
-            {formatDashboardAmount(
-              snapshot.totalAssets,
-              snapshot.baseCurrency,
-              amountDisplayMode,
-            )}
-          </h2>
+          <h2>{formatDashboardAmount(snapshot.totalAssets, snapshot.baseCurrency)}</h2>
           <p className="muted">Stored account cash plus saved holding values.</p>
         </article>
         <article className="resource-card stack">
           <p className="eyebrow">Total liabilities</p>
-          <h2>
-            {formatDashboardAmount(
-              snapshot.totalLiabilities,
-              snapshot.baseCurrency,
-              amountDisplayMode,
-            )}
-          </h2>
+          <h2>{formatDashboardAmount(snapshot.totalLiabilities, snapshot.baseCurrency)}</h2>
           <p className="muted">Saved debt balances carried by the latest snapshot.</p>
         </article>
         <article className="resource-card stack">
           <p className="eyebrow">Cash position</p>
-          <h2>
-            {formatDashboardAmount(
-              snapshot.cashPosition,
-              snapshot.baseCurrency,
-              amountDisplayMode,
-            )}
-          </h2>
+          <h2>{formatDashboardAmount(snapshot.cashPosition, snapshot.baseCurrency)}</h2>
           <p className="muted">Saved cash balances from the latest formal snapshot.</p>
         </article>
       </div>
@@ -223,14 +151,9 @@ export function DashboardPageView({ dashboard }: DashboardPageViewProps) {
       <DashboardAllocationCard
         allocation={dashboard.allocation}
         baseCurrency={snapshot.baseCurrency}
-        amountDisplayMode={amountDisplayMode}
       />
 
-      <DashboardTrendCard
-        trend={dashboard.trend}
-        baseCurrency={snapshot.baseCurrency}
-        amountDisplayMode={amountDisplayMode}
-      />
+      <DashboardTrendCard trend={dashboard.trend} baseCurrency={snapshot.baseCurrency} />
 
       <div className="dashboard-grid dashboard-grid-secondary">
         <article className="resource-card stack">

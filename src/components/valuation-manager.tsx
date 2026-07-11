@@ -3,6 +3,7 @@
 import React from "react";
 import { FormEvent, useEffect, useState } from "react";
 
+import { formatReadOnlyMoney } from "@/lib/read-only-money-format";
 import { useWorkspaceMutation } from "@/components/workspace-mutation-boundary";
 import type {
   ValuationContext,
@@ -271,28 +272,42 @@ export function ValuationManager() {
                     <h3>Summary</h3>
                     <p className="muted">Status: {preview.status}</p>
                   </div>
-                  <strong>{preview.netWorth} {preview.baseCurrency}</strong>
+                  <strong>
+                    {formatReadOnlyMoney(preview.netWorth, { currency: preview.baseCurrency })}
+                  </strong>
                 </div>
                 <dl className="detail-grid">
                   <div>
                     <dt>Total assets</dt>
-                    <dd>{preview.totalAssets} {preview.baseCurrency}</dd>
+                    <dd>{formatReadOnlyMoney(preview.totalAssets, { currency: preview.baseCurrency })}</dd>
                   </div>
                   <div>
                     <dt>Total liabilities</dt>
-                    <dd>{preview.totalLiabilities} {preview.baseCurrency}</dd>
+                    <dd>
+                      {formatReadOnlyMoney(preview.totalLiabilities, {
+                        currency: preview.baseCurrency,
+                      })}
+                    </dd>
                   </div>
                   <div>
                     <dt>Cash position</dt>
-                    <dd>{preview.cashPosition} {preview.baseCurrency}</dd>
+                    <dd>{formatReadOnlyMoney(preview.cashPosition, { currency: preview.baseCurrency })}</dd>
                   </div>
                   <div>
                     <dt>Investment value</dt>
-                    <dd>{preview.investmentValue} {preview.baseCurrency}</dd>
+                    <dd>
+                      {formatReadOnlyMoney(preview.investmentValue, {
+                        currency: preview.baseCurrency,
+                      })}
+                    </dd>
                   </div>
                   <div>
                     <dt>Monthly debt payments</dt>
-                    <dd>{preview.monthlyDebtPaymentTotal} {preview.baseCurrency}</dd>
+                    <dd>
+                      {formatReadOnlyMoney(preview.monthlyDebtPaymentTotal, {
+                        currency: preview.baseCurrency,
+                      })}
+                    </dd>
                   </div>
                   <div>
                     <dt>Preview payload</dt>
@@ -337,8 +352,11 @@ export function ValuationManager() {
                   <div key={account.sourceAccountId}>
                     <strong>{account.accountName}</strong>
                     <p className="muted">
-                      Cash {account.cashValue} · Holdings {account.holdingsValue} · Total{" "}
-                      {account.totalValue} {preview.baseCurrency}
+                      Cash {formatReadOnlyMoney(account.cashValue)} · Holdings{" "}
+                      {formatReadOnlyMoney(account.holdingsValue)} · Total{" "}
+                      {formatReadOnlyMoney(account.totalValue, {
+                        currency: preview.baseCurrency,
+                      })}
                     </p>
                   </div>
                 ))}
@@ -359,9 +377,14 @@ export function ValuationManager() {
                       <p className="muted">
                         {holding.quantity} units ·{" "}
                         {holding.priceAmount
-                          ? `${holding.priceAmount} ${holding.priceCurrency}`
+                          ? formatReadOnlyMoney(holding.priceAmount, {
+                              currency: holding.priceCurrency ?? undefined,
+                            })
                           : "No latest price"}{" "}
-                        · Value {holding.marketValue} {preview.baseCurrency}
+                        · Value{" "}
+                        {formatReadOnlyMoney(holding.marketValue, {
+                          currency: preview.baseCurrency,
+                        })}
                       </p>
                     </div>
                   ))
@@ -381,8 +404,14 @@ export function ValuationManager() {
                     <div key={liability.sourceLiabilityId}>
                       <strong>{liability.liabilityName}</strong>
                       <p className="muted">
-                        Balance {liability.balanceValue} · Monthly payment{" "}
-                        {liability.monthlyPaymentValue} {preview.baseCurrency}
+                        Balance{" "}
+                        {formatReadOnlyMoney(liability.balanceValue, {
+                          currency: preview.baseCurrency,
+                        })}{" "}
+                        · Monthly payment{" "}
+                        {formatReadOnlyMoney(liability.monthlyPaymentValue, {
+                          currency: preview.baseCurrency,
+                        })}
                       </p>
                     </div>
                   ))

@@ -3,6 +3,8 @@
 import { useRef } from "react";
 import { useEffect, useState } from "react";
 
+import { formatReadOnlyMoney } from "@/lib/read-only-money-format";
+
 type SnapshotSummary = {
   id: string;
   status: "COMPLETE" | "INCOMPLETE";
@@ -204,10 +206,13 @@ export function SnapshotManager() {
                     Status: {snapshot.status} · {snapshot.issueCount} issues
                   </p>
                 </div>
-                <strong>{snapshot.netWorth} {snapshot.baseCurrency}</strong>
+                <strong>
+                  {formatReadOnlyMoney(snapshot.netWorth, { currency: snapshot.baseCurrency })}
+                </strong>
               </div>
               <p className="muted">
-                Assets {snapshot.totalAssets} · Liabilities {snapshot.totalLiabilities} ·{" "}
+                Assets {formatReadOnlyMoney(snapshot.totalAssets)} · Liabilities{" "}
+                {formatReadOnlyMoney(snapshot.totalLiabilities)} ·{" "}
                 {snapshot.accountCount} accounts · {snapshot.holdingCount} holdings ·{" "}
                 {snapshot.liabilityCount} liabilities
               </p>
@@ -235,29 +240,51 @@ export function SnapshotManager() {
                     <h3>Summary</h3>
                     <p className="muted">Status: {selectedSnapshot.status}</p>
                   </div>
-                  <strong>{selectedSnapshot.netWorth} {selectedSnapshot.baseCurrency}</strong>
+                  <strong>
+                    {formatReadOnlyMoney(selectedSnapshot.netWorth, {
+                      currency: selectedSnapshot.baseCurrency,
+                    })}
+                  </strong>
                 </div>
                 <dl className="detail-grid">
                   <div>
                     <dt>Total assets</dt>
-                    <dd>{selectedSnapshot.totalAssets} {selectedSnapshot.baseCurrency}</dd>
+                    <dd>
+                      {formatReadOnlyMoney(selectedSnapshot.totalAssets, {
+                        currency: selectedSnapshot.baseCurrency,
+                      })}
+                    </dd>
                   </div>
                   <div>
                     <dt>Total liabilities</dt>
-                    <dd>{selectedSnapshot.totalLiabilities} {selectedSnapshot.baseCurrency}</dd>
+                    <dd>
+                      {formatReadOnlyMoney(selectedSnapshot.totalLiabilities, {
+                        currency: selectedSnapshot.baseCurrency,
+                      })}
+                    </dd>
                   </div>
                   <div>
                     <dt>Cash position</dt>
-                    <dd>{selectedSnapshot.cashPosition} {selectedSnapshot.baseCurrency}</dd>
+                    <dd>
+                      {formatReadOnlyMoney(selectedSnapshot.cashPosition, {
+                        currency: selectedSnapshot.baseCurrency,
+                      })}
+                    </dd>
                   </div>
                   <div>
                     <dt>Investment value</dt>
-                    <dd>{selectedSnapshot.investmentValue} {selectedSnapshot.baseCurrency}</dd>
+                    <dd>
+                      {formatReadOnlyMoney(selectedSnapshot.investmentValue, {
+                        currency: selectedSnapshot.baseCurrency,
+                      })}
+                    </dd>
                   </div>
                   <div>
                     <dt>Monthly debt payments</dt>
                     <dd>
-                      {selectedSnapshot.monthlyDebtPaymentTotal} {selectedSnapshot.baseCurrency}
+                      {formatReadOnlyMoney(selectedSnapshot.monthlyDebtPaymentTotal, {
+                        currency: selectedSnapshot.baseCurrency,
+                      })}
                     </dd>
                   </div>
                 </dl>
@@ -297,8 +324,14 @@ export function SnapshotManager() {
                   <div key={account.id}>
                     <strong>{account.accountName}</strong>
                     <p className="muted">
-                      {formatEnumLabel(account.accountType)} · Cash {account.cashBalance}{" "}
-                      {account.currency} · Total {account.totalValue} {selectedSnapshot.baseCurrency}
+                      {formatEnumLabel(account.accountType)} · Cash{" "}
+                      {formatReadOnlyMoney(account.cashBalance, {
+                        currency: account.currency,
+                      })}{" "}
+                      · Total{" "}
+                      {formatReadOnlyMoney(account.totalValue, {
+                        currency: selectedSnapshot.baseCurrency,
+                      })}
                     </p>
                   </div>
                 ))}
@@ -316,10 +349,14 @@ export function SnapshotManager() {
                     <p className="muted">
                       {holding.quantity} units ·{" "}
                       {holding.priceAmount && holding.priceCurrency
-                        ? `${holding.priceAmount} ${holding.priceCurrency}`
+                        ? formatReadOnlyMoney(holding.priceAmount, {
+                            currency: holding.priceCurrency,
+                          })
                         : "Missing price"}{" "}
-                      · FX {holding.fxRateToBase ?? "missing"} · Value {holding.marketValue}{" "}
-                      {selectedSnapshot.baseCurrency}
+                      · FX {holding.fxRateToBase ?? "missing"} · Value{" "}
+                      {formatReadOnlyMoney(holding.marketValue, {
+                        currency: selectedSnapshot.baseCurrency,
+                      })}
                     </p>
                   </div>
                 ))}
@@ -337,9 +374,14 @@ export function SnapshotManager() {
                   <div key={liability.id}>
                     <strong>{liability.liabilityName}</strong>
                     <p className="muted">
-                      Balance {liability.currentBalance} {liability.currency} · FX{" "}
-                      {liability.fxRateToBase ?? "missing"} · Value {liability.balanceValue}{" "}
-                      {selectedSnapshot.baseCurrency}
+                      Balance{" "}
+                      {formatReadOnlyMoney(liability.currentBalance, {
+                        currency: liability.currency,
+                      })}{" "}
+                      · FX {liability.fxRateToBase ?? "missing"} · Value{" "}
+                      {formatReadOnlyMoney(liability.balanceValue, {
+                        currency: selectedSnapshot.baseCurrency,
+                      })}
                     </p>
                   </div>
                 ))}

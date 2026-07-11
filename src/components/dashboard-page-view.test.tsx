@@ -7,7 +7,6 @@ import React, { act } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { DASHBOARD_AMOUNT_DISPLAY_STORAGE_KEY } from "@/components/dashboard-amount-format";
 import { DashboardPageView } from "@/components/dashboard-page-view";
 import { getDashboardTrendAxisLayout } from "@/components/dashboard-trend-card";
 import type { DashboardSummary } from "@/modules/dashboard/service";
@@ -272,7 +271,7 @@ test("dashboard page view renders summary-first sections and limits reminders to
   );
 });
 
-test("dashboard page view defaults dashboard amounts to compact K display", () => {
+test("dashboard page view formats read-only money values with K units", () => {
   const markup = renderToStaticMarkup(
     <DashboardPageView
       dashboard={createDashboardSummary({
@@ -318,9 +317,6 @@ test("dashboard page view defaults dashboard amounts to compact K display", () =
     />,
   );
 
-  assert.match(markup, /Amount display/);
-  assert.match(markup, /Compact/);
-  assert.match(markup, /Full/);
   assert.match(markup, /999\.99 TWD/);
   assert.match(markup, /1\.2K TWD/);
   assert.match(markup, /1K TWD/);
@@ -513,79 +509,11 @@ test("dashboard trend card renders the selected visible window only", () => {
   assert.match(markup, /Jul 4/);
 });
 
-test("dashboard page view persists the full amount display preference", async () => {
-  const { document, root, restore } = createDashboardDom();
-  const dashboard = createDashboardSummary({
-    latestSnapshot: {
-      id: "snapshot-1",
-      status: SnapshotStatus.COMPLETE,
-      baseCurrency: "TWD",
-      totalAssets: "1200.00",
-      totalLiabilities: "1000.00",
-      netWorth: "999.99",
-      cashPosition: "300.00",
-      investmentValue: "900.00",
-      monthlyDebtPaymentTotal: "120.00",
-      snapshotAt: "2026-07-08T00:00:00.000Z",
-      issueCount: 4,
-      accountCount: 2,
-      holdingCount: 3,
-      liabilityCount: 1,
-    },
-  });
+test("dashboard trend chart keeps compact axis spacing for K-formatted labels", () => {
+  const layout = getDashboardTrendAxisLayout();
 
-  try {
-    await act(async () => {
-      root.render(<DashboardPageView dashboard={dashboard} />);
-      await Promise.resolve();
-    });
-
-    assert.match(document.body.textContent ?? "", /1\.2K TWD/);
-
-    const fullButton = document.querySelector<HTMLButtonElement>(
-      '.dashboard-segmented-control button[aria-pressed="false"]',
-    );
-    assert.ok(fullButton);
-    assert.equal(fullButton.textContent, "Full");
-
-    await act(async () => {
-      fullButton.click();
-      await Promise.resolve();
-    });
-
-    assert.equal(
-      globalThis.localStorage.getItem(DASHBOARD_AMOUNT_DISPLAY_STORAGE_KEY),
-      "full",
-    );
-    assert.match(document.body.textContent ?? "", /1200\.00 TWD/);
-    assert.doesNotMatch(document.body.textContent ?? "", /1\.2K TWD/);
-
-    await unmount(root);
-
-    const remountRootElement = document.getElementById("root");
-    assert.ok(remountRootElement);
-    const remountRoot = createRoot(remountRootElement);
-
-    await act(async () => {
-      remountRoot.render(<DashboardPageView dashboard={dashboard} />);
-      await Promise.resolve();
-    });
-
-    assert.match(document.body.textContent ?? "", /1200\.00 TWD/);
-    assert.doesNotMatch(document.body.textContent ?? "", /1\.2K TWD/);
-    await unmount(remountRoot);
-  } finally {
-    restore();
-  }
-});
-
-test("dashboard trend chart reserves wider axis space for full amount labels", () => {
-  const compactLayout = getDashboardTrendAxisLayout("compact");
-  const fullLayout = getDashboardTrendAxisLayout("full");
-
-  assert.equal(compactLayout.yAxisWidth, 72);
-  assert.ok(fullLayout.yAxisWidth > compactLayout.yAxisWidth);
-  assert.ok(fullLayout.margin.left > compactLayout.margin.left);
+  assert.equal(layout.yAxisWidth, 72);
+  assert.equal(layout.margin.left, -20);
 });
 
 test("dashboard page view renders a stable allocation fallback when no allocation data exists", () => {

@@ -463,7 +463,7 @@ test("asset symbol guidance only appears for auto-priced assets", () => {
 });
 
 test("formatCurrencyAmount falls back safely when the currency code is invalid", () => {
-  assert.equal(formatCurrencyAmount("1234.50", "INVALID!"), "INVALID! 1234.50");
+  assert.equal(formatCurrencyAmount("1234.50", "INVALID!"), "INVALID! 1.2K");
 });
 
 test("getAccountActionLabel includes institution context for duplicate account names", () => {
@@ -507,6 +507,7 @@ test("account cards expose archive actions and inactive-state rendering", () => 
   assert.match(activeMarkup, /Active/);
   assert.match(activeMarkup, /Archive/);
   assert.match(activeMarkup, /aria-label="Archive Checking at North Bank"/);
+  assert.match(activeMarkup, /USD 1\.2K/);
 
   const inactiveMarkup = renderToStaticMarkup(
     <AccountRecordCard
@@ -528,6 +529,7 @@ test("account cards expose archive actions and inactive-state rendering", () => 
 
   assert.match(inactiveMarkup, /Inactive/);
   assert.match(inactiveMarkup, /Mark active/);
+  assert.match(inactiveMarkup, /USD 1\.2K/);
   assert.doesNotMatch(inactiveMarkup, /Archived/);
 });
 

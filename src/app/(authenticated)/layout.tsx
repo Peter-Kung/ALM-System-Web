@@ -96,5 +96,5 @@ function formatMetricValue(value: string | null, currency: string) {
 }
 
 function formatSnapshotPulseAmount(value: string, currency: string) {
-  return formatDashboardAmount(value, currency, "compact");
+  return formatDashboardAmount(value, currency);
 }
