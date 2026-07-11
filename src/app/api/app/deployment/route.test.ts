@@ -36,6 +36,9 @@ function createDependencies(role: "ADMIN" | "USER" = "ADMIN") {
     async checkState() {
       return { ...deployment, lastCheckAt: "2026-07-11T10:30:00.000Z" };
     },
+    deploymentControlsEnabled() {
+      return true;
+    },
     async getState() {
       return deployment;
     },
@@ -103,6 +106,19 @@ test("deployment handlers reject non-administrator sessions", async () => {
 
   assert.equal(response.status, 403);
   assert.deepEqual(await response.json(), { error: "Administrator access required." });
+  assert.deepEqual(operations, []);
+});
+
+test("deployment handlers reject runtimes with disabled deployment controls", async () => {
+  const { dependencies, operations } = createDependencies();
+  dependencies.deploymentControlsEnabled = () => false;
+
+  const response = await startUpdateHandler(createRequest(), dependencies);
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    error: "Deployment controls are disabled for this runtime.",
+  });
   assert.deepEqual(operations, []);
 });
 

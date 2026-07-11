@@ -8,11 +8,13 @@ import {
   startDeploymentOperation,
   type DeploymentState,
 } from "@/modules/deployment";
+import { deploymentControlsEnabled } from "@/modules/deployment/runtime";
 
 type RequireApiSession = typeof requireApiSession;
 
 export type DeploymentHandlerDependencies = {
   checkState: () => Promise<DeploymentState>;
+  deploymentControlsEnabled: () => boolean;
   getState: () => Promise<DeploymentState>;
   requireSession: RequireApiSession;
   startOperation: typeof startDeploymentOperation;
@@ -20,12 +22,23 @@ export type DeploymentHandlerDependencies = {
 
 export const defaultDeploymentHandlerDependencies: DeploymentHandlerDependencies = {
   checkState: () => checkDeploymentState(),
+  deploymentControlsEnabled: () => deploymentControlsEnabled(),
   getState: () => getDeploymentState(),
   requireSession: requireApiSession,
   startOperation: startDeploymentOperation,
 };
 
 async function requireAdmin(dependencies: DeploymentHandlerDependencies) {
+  if (!dependencies.deploymentControlsEnabled()) {
+    return {
+      response: NextResponse.json(
+        { error: "Deployment controls are disabled for this runtime." },
+        { status: 503 },
+      ),
+      session: null,
+    };
+  }
+
   const { response, session } = await dependencies.requireSession();
   if (response || !session) {
     return { response, session: null };

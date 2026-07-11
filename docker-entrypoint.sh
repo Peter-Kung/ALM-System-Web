@@ -8,6 +8,12 @@ set -eu
 : "${ALM_UPLOADS_DIR:=$ALM_STORAGE_ROOT/uploads}"
 : "${DATABASE_URL:=file:$ALM_DATA_DIR/alm-system.db}"
 
+if [ "${ALM_REQUIRE_FRESH_POSTGRES_ACKNOWLEDGEMENT:-0}" = "1" ] && [ "${ALM_FRESH_POSTGRES_ACKNOWLEDGED:-0}" != "1" ]; then
+  echo "This family PostgreSQL runtime does not migrate existing SQLite deployments automatically." >&2
+  echo "Set ALM_FRESH_POSTGRES_ACKNOWLEDGED=1 only after confirming this runtime targets a fresh PostgreSQL install." >&2
+  exit 1
+fi
+
 export ALM_STORAGE_ROOT
 export ALM_DATA_DIR
 export ALM_BACKUP_DIR

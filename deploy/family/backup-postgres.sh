@@ -5,6 +5,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -
 backup_dir="${ALM_FAMILY_BACKUP_DIR:-${script_dir}/backups}"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 backup_path="${backup_dir}/alm-system-${timestamp}.dump"
+temp_backup_path=""
 
 compose_bin=()
 if docker compose version >/dev/null 2>&1; then
@@ -18,12 +19,16 @@ fi
 
 mkdir -p "$backup_dir"
 chmod 0700 "$backup_dir"
+temp_backup_path="$(mktemp "${backup_path}.tmp.XXXXXX")"
+trap 'rm -f "$temp_backup_path"' EXIT
+chmod 0600 "$temp_backup_path"
 
 (
   cd "$script_dir"
   "${compose_bin[@]}" exec -T postgres \
     sh -lc 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
-) >"$backup_path"
+) >"$temp_backup_path"
 
-chmod 0600 "$backup_path"
+mv "$temp_backup_path" "$backup_path"
+trap - EXIT
 echo "Created PostgreSQL backup at ${backup_path}"

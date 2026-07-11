@@ -11,12 +11,14 @@ services:
     env_file:
       - ./.env
     environment:
+      ALM_DISABLE_DEPLOYMENT_CONTROLS: "1"
+      ALM_REQUIRE_FRESH_POSTGRES_ACKNOWLEDGEMENT: "1"
       HOSTNAME: 0.0.0.0
       NODE_ENV: production
       PORT: 3000
       PRISMA_SCHEMA_PATH: prisma/postgresql/schema.prisma
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3000}:3000"
     restart: unless-stopped
     volumes:
       - ./backups:/var/lib/alm-system/backups
@@ -36,6 +38,7 @@ services:
       - ./.env
     environment:
       ALM_SKIP_PRISMA_MIGRATE: "1"
+      ALM_REQUIRE_FRESH_POSTGRES_ACKNOWLEDGEMENT: "1"
       NODE_ENV: production
       PRISMA_SCHEMA_PATH: prisma/postgresql/schema.prisma
     restart: unless-stopped
