@@ -79,10 +79,20 @@ type PriceRecord = {
 type ManagedUserRecord = {
   id: string;
   username: string;
+  displayName: string | null;
   role: UserRole;
   isActive: boolean;
   sessionVersion: number;
+  loginLockout: {
+    failedAttempts: number;
+    lockedUntil: string | null;
+  };
   lastLoginAt: string | null;
+  telegramBinding: {
+    state: "BOUND" | "UNBOUND";
+    telegramUsername: string | null;
+    boundAt: string | null;
+  };
   createdAt: string;
   updatedAt: string;
 };
@@ -160,6 +170,7 @@ type ManualPriceFormState = {
 };
 
 type UserFormState = {
+  displayName: string;
   username: string;
   role: UserRole;
   isActive: boolean;
@@ -216,6 +227,7 @@ const emptyManualPriceForm: ManualPriceFormState = {
 };
 
 const emptyUserForm: UserFormState = {
+  displayName: "",
   username: "",
   role: UserRole.USER,
   isActive: true,
@@ -393,7 +405,7 @@ function UsersManager() {
 
   async function requestUserAction(
     user: ManagedUserRecord,
-    action: "activation-request" | "password-reset-request",
+    action: "activation-request" | "password-reset-request" | "telegram-binding-code",
   ) {
     await runWorkspaceMutation(async () => {
       setRequestingUserId(`${user.id}:${action}`);
@@ -405,7 +417,9 @@ function UsersManager() {
           method: "POST",
         });
         const payload = (await response.json()) as {
+          bindingCode?: string;
           delivery?: string;
+          expiresAt?: string;
           error?: string;
         };
 
@@ -413,7 +427,15 @@ function UsersManager() {
           throw new Error(payload.error ?? "Failed to request user onboarding action.");
         }
 
-        setStatusMessage(formatUserActionStatus(user.username, action, payload.delivery));
+        setStatusMessage(
+          formatUserActionStatus(
+            user.username,
+            action,
+            payload.delivery,
+            payload.bindingCode,
+            payload.expiresAt,
+          ),
+        );
       } catch (requestError) {
         setError(
           requestError instanceof Error
@@ -451,6 +473,14 @@ function UsersManager() {
               </p>
             </div>
           </div>
+          <label className="field">
+            <span>Display name</span>
+            <input
+              value={form.displayName}
+              onChange={(event) => setForm({ ...form, displayName: event.target.value })}
+              placeholder="Family Member"
+            />
+          </label>
           <label className="field">
             <span>Username</span>
             <input
@@ -530,6 +560,9 @@ function UsersManager() {
                 onRequestActivation={() =>
                   void requestUserAction(user, "activation-request")
                 }
+                onRequestBindingCode={() =>
+                  void requestUserAction(user, "telegram-binding-code")
+                }
                 onRequestPasswordReset={() =>
                   void requestUserAction(user, "password-reset-request")
                 }
@@ -544,9 +577,18 @@ function UsersManager() {
 
 function formatUserActionStatus(
   username: string,
-  action: "activation-request" | "password-reset-request",
+  action: "activation-request" | "password-reset-request" | "telegram-binding-code",
   delivery?: string,
+  bindingCode?: string,
+  expiresAt?: string,
 ) {
+  if (action === "telegram-binding-code") {
+    const expiryLabel = expiresAt ? formatDateTime(expiresAt) : "soon";
+    return bindingCode
+      ? `Telegram binding code for ${username}: ${bindingCode}. Expires ${expiryLabel}.`
+      : `Telegram binding code requested for ${username}.`;
+  }
+
   if (delivery === "pending_self_managed_onboarding") {
     return `${username} is waiting for the self-managed onboarding flow; no password was issued.`;
   }
@@ -563,6 +605,7 @@ function UserRecordCard({
   onRoleChange,
   onStatusChange,
   onRequestActivation,
+  onRequestBindingCode,
   onRequestPasswordReset,
 }: {
   user: ManagedUserRecord;
@@ -571,16 +614,23 @@ function UserRecordCard({
   onRoleChange: (role: UserRole) => void;
   onStatusChange: (isActive: boolean) => void;
   onRequestActivation: () => void;
+  onRequestBindingCode: () => void;
   onRequestPasswordReset: () => void;
 }) {
   const activationRequestId = `${user.id}:activation-request`;
+  const bindingCodeRequestId = `${user.id}:telegram-binding-code`;
   const passwordResetRequestId = `${user.id}:password-reset-request`;
+  const bindingActionLabel =
+    user.telegramBinding.state === "BOUND"
+      ? "Regenerate binding code"
+      : "Generate binding code";
 
   return (
     <article className="resource-card user-card stack">
       <div className="section-heading">
         <div>
           <h3>{user.username}</h3>
+          {user.displayName ? <p className="muted">{user.displayName}</p> : null}
           <p className="muted">Last login {formatNullableDateTime(user.lastLoginAt)}</p>
         </div>
         <span
@@ -595,6 +645,14 @@ function UserRecordCard({
         <div>
           <dt>Role</dt>
           <dd>{formatEnumLabel(user.role)}</dd>
+        </div>
+        <div>
+          <dt>Telegram</dt>
+          <dd>{formatTelegramBindingLabel(user)}</dd>
+        </div>
+        <div>
+          <dt>Lockout</dt>
+          <dd>{formatLoginLockoutLabel(user)}</dd>
         </div>
         <div>
           <dt>Session version</dt>
@@ -628,6 +686,14 @@ function UserRecordCard({
         </label>
       </div>
       <div className="account-card-actions">
+        <button
+          type="button"
+          className="ghost-button compact-button"
+          disabled={requestingUserId === bindingCodeRequestId}
+          onClick={onRequestBindingCode}
+        >
+          {requestingUserId === bindingCodeRequestId ? "Requesting..." : bindingActionLabel}
+        </button>
         {user.isActive ? (
           <button
             type="button"
@@ -654,6 +720,34 @@ function UserRecordCard({
       </div>
     </article>
   );
+}
+
+function formatLoginLockoutLabel(user: ManagedUserRecord) {
+  if (user.loginLockout.lockedUntil) {
+    return `Locked until ${formatDateTime(user.loginLockout.lockedUntil)}`;
+  }
+
+  if (user.loginLockout.failedAttempts > 0) {
+    return `${user.loginLockout.failedAttempts} failed attempt${
+      user.loginLockout.failedAttempts === 1 ? "" : "s"
+    }`;
+  }
+
+  return "No active lockout";
+}
+
+function formatTelegramBindingLabel(user: ManagedUserRecord) {
+  if (user.telegramBinding.state === "BOUND") {
+    const usernameLabel = user.telegramBinding.telegramUsername
+      ? `@${user.telegramBinding.telegramUsername}`
+      : "bound account";
+    const boundAtLabel = user.telegramBinding.boundAt
+      ? ` since ${formatDateTime(user.telegramBinding.boundAt)}`
+      : "";
+    return `${usernameLabel}${boundAtLabel}`;
+  }
+
+  return "Waiting for Telegram binding";
 }
 
 export function formatCurrencyAmount(value: string, currency: string) {

@@ -236,6 +236,7 @@ test("users management section renders admin controls without password fields", 
 
   assert.match(markup, /User management/);
   assert.match(markup, /Create user/);
+  assert.match(markup, /Display name/);
   assert.match(markup, /User directory/);
   assert.doesNotMatch(markup, /Temporary password/);
   assert.doesNotMatch(markup, /type="password"/);
@@ -255,10 +256,20 @@ test("users management actions show pending self-managed onboarding status", asy
           {
             id: "user-member",
             username: "member",
+            displayName: "Family Member",
             role: UserRole.USER,
             isActive: false,
             sessionVersion: 0,
+            loginLockout: {
+              failedAttempts: 0,
+              lockedUntil: null,
+            },
             lastLoginAt: null,
+            telegramBinding: {
+              state: "UNBOUND",
+              telegramUsername: null,
+              boundAt: null,
+            },
             createdAt: "2026-07-11T00:00:00.000Z",
             updatedAt: "2026-07-11T00:00:00.000Z",
           },
@@ -326,10 +337,20 @@ test("users management shows password reset only for active users", async () => 
           {
             id: "user-member",
             username: "member",
+            displayName: null,
             role: UserRole.USER,
             isActive: true,
             sessionVersion: 0,
+            loginLockout: {
+              failedAttempts: 0,
+              lockedUntil: null,
+            },
             lastLoginAt: null,
+            telegramBinding: {
+              state: "BOUND",
+              telegramUsername: "member_handle",
+              boundAt: "2026-07-11T06:00:00.000Z",
+            },
             createdAt: "2026-07-11T00:00:00.000Z",
             updatedAt: "2026-07-11T00:00:00.000Z",
           },
@@ -353,6 +374,95 @@ test("users management shows password reset only for active users", async () => 
 
     assert.match(document.body.textContent ?? "", /Request password reset/);
     assert.doesNotMatch(document.body.textContent ?? "", /Request activation/);
+  } finally {
+    globalThis.fetch = previousFetch;
+    await unmount(root);
+    restore();
+  }
+});
+
+test("users management surfaces Telegram binding and lockout details", async () => {
+  const { document, root, restore } = createDom();
+  const previousFetch = globalThis.fetch;
+
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input);
+
+    if (url === "/api/admin/users" && init === undefined) {
+      return Response.json({
+        users: [
+          {
+            id: "user-member",
+            username: "member",
+            displayName: "Family Member",
+            role: UserRole.USER,
+            isActive: true,
+            sessionVersion: 2,
+            loginLockout: {
+              failedAttempts: 5,
+              lockedUntil: "2026-07-11T10:10:00.000Z",
+            },
+            lastLoginAt: "2026-07-11T09:00:00.000Z",
+            telegramBinding: {
+              state: "BOUND",
+              telegramUsername: "family_member",
+              boundAt: "2026-07-11T08:30:00.000Z",
+            },
+            createdAt: "2026-07-11T00:00:00.000Z",
+            updatedAt: "2026-07-11T00:00:00.000Z",
+          },
+        ],
+      });
+    }
+
+    if (
+      url === "/api/admin/users/user-member/telegram-binding-code" &&
+      init?.method === "POST"
+    ) {
+      return Response.json(
+        {
+          bindingCode: "ABCD-1234",
+          delivery: "share_with_user",
+          expiresAt: "2026-07-11T10:05:00.000Z",
+        },
+        { status: 202 },
+      );
+    }
+
+    throw new Error(`Unexpected fetch request: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    await act(async () => {
+      root.render(
+        <WorkspaceMutationBoundary>
+          <ManagementSection section="users" />
+        </WorkspaceMutationBoundary>,
+      );
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    assert.match(document.body.textContent ?? "", /Family Member/);
+    assert.match(document.body.textContent ?? "", /@family_member since/);
+    assert.match(document.body.textContent ?? "", /Locked until/);
+    assert.match(document.body.textContent ?? "", /Regenerate binding code/);
+
+    const bindingButton = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === "Regenerate binding code",
+    );
+    assert.ok(bindingButton);
+
+    await act(async () => {
+      bindingButton.click();
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    assert.match(
+      document.body.textContent ?? "",
+      /Telegram binding code for member: ABCD-1234\./,
+    );
   } finally {
     globalThis.fetch = previousFetch;
     await unmount(root);
