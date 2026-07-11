@@ -5,6 +5,7 @@ import {
   AssetPriceSourceType,
   AssetType,
   LiabilityType,
+  UserRole,
 } from "@prisma/client";
 import React from "react";
 import { FormEvent, useEffect, useState } from "react";
@@ -72,6 +73,17 @@ type PriceRecord = {
   recordedAt: string;
   isValid: boolean;
   asset: Pick<AssetRecord, "id" | "name" | "symbol" | "currency" | "priceSourceType">;
+};
+
+type ManagedUserRecord = {
+  id: string;
+  username: string;
+  role: UserRole;
+  isActive: boolean;
+  sessionVersion: number;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type PriceRefreshResult = {
@@ -146,6 +158,12 @@ type ManualPriceFormState = {
   isValid: boolean;
 };
 
+type UserFormState = {
+  username: string;
+  role: UserRole;
+  isActive: boolean;
+};
+
 const emptyAccountForm: AccountFormState = {
   name: "",
   institutionName: "",
@@ -196,6 +214,12 @@ const emptyManualPriceForm: ManualPriceFormState = {
   isValid: true,
 };
 
+const emptyUserForm: UserFormState = {
+  username: "",
+  role: UserRole.USER,
+  isActive: true,
+};
+
 export function getAssetSymbolGuidance(priceSourceType: AssetPriceSourceType) {
   if (priceSourceType !== AssetPriceSourceType.AUTO) {
     return null;
@@ -243,6 +267,10 @@ export function ManagementSection({ section }: SectionProps) {
     return <SnapshotManager />;
   }
 
+  if (section === "users") {
+    return <UsersManager />;
+  }
+
   return (
     <section className="stack">
       <div className="hero stack">
@@ -253,6 +281,374 @@ export function ManagementSection({ section }: SectionProps) {
         </p>
       </div>
     </section>
+  );
+}
+
+function UsersManager() {
+  const { runWorkspaceMutation } = useWorkspaceMutation();
+  const [users, setUsers] = useState<ManagedUserRecord[]>([]);
+  const [form, setForm] = useState<UserFormState>(emptyUserForm);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [requestingUserId, setRequestingUserId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadUsers();
+  }, []);
+
+  async function loadUsers() {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/admin/users");
+      const payload = (await response.json()) as {
+        users?: ManagedUserRecord[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to load users.");
+      }
+
+      setUsers(payload.users ?? []);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Failed to load users.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await runWorkspaceMutation(async () => {
+      setIsSaving(true);
+      setError(null);
+      setStatusMessage(null);
+
+      try {
+        const response = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+        const payload = (await response.json()) as {
+          user?: ManagedUserRecord;
+          error?: string;
+        };
+
+        if (!response.ok || !payload.user) {
+          throw new Error(payload.error ?? "Failed to create user.");
+        }
+
+        setUsers((currentUsers) => [...currentUsers, payload.user as ManagedUserRecord]);
+        setForm(emptyUserForm);
+        setStatusMessage(`Created ${payload.user.username}.`);
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : "Failed to create user.");
+      } finally {
+        setIsSaving(false);
+      }
+    });
+  }
+
+  async function updateUser(user: ManagedUserRecord, updates: Partial<UserFormState>) {
+    await runWorkspaceMutation(async () => {
+      setUpdatingUserId(user.id);
+      setError(null);
+      setStatusMessage(null);
+
+      try {
+        const response = await fetch(`/api/admin/users/${user.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
+        });
+        const payload = (await response.json()) as {
+          user?: ManagedUserRecord;
+          error?: string;
+        };
+
+        if (!response.ok || !payload.user) {
+          throw new Error(payload.error ?? "Failed to update user.");
+        }
+
+        setUsers((currentUsers) =>
+          currentUsers.map((currentUser) =>
+            currentUser.id === payload.user?.id ? payload.user : currentUser,
+          ),
+        );
+        setStatusMessage(`Updated ${payload.user.username}.`);
+      } catch (updateError) {
+        setError(updateError instanceof Error ? updateError.message : "Failed to update user.");
+      } finally {
+        setUpdatingUserId(null);
+      }
+    });
+  }
+
+  async function requestUserAction(
+    user: ManagedUserRecord,
+    action: "activation-request" | "password-reset-request",
+  ) {
+    await runWorkspaceMutation(async () => {
+      setRequestingUserId(`${user.id}:${action}`);
+      setError(null);
+      setStatusMessage(null);
+
+      try {
+        const response = await fetch(`/api/admin/users/${user.id}/${action}`, {
+          method: "POST",
+        });
+        const payload = (await response.json()) as {
+          delivery?: string;
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to request user onboarding action.");
+        }
+
+        setStatusMessage(formatUserActionStatus(user.username, action, payload.delivery));
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Failed to request user onboarding action.",
+        );
+      } finally {
+        setRequestingUserId(null);
+      }
+    });
+  }
+
+  const activeAdminCount = users.filter(
+    (user) => user.role === UserRole.ADMIN && user.isActive,
+  ).length;
+
+  return (
+    <section className="stack">
+      <div className="hero stack">
+        <p className="eyebrow">User management</p>
+        <h1>Users</h1>
+        <p className="muted">
+          Manage database-backed identities, roles, and access state while keeping
+          passwords self-managed by each user.
+        </p>
+      </div>
+      <div className="management-grid">
+        <form className="card stack management-form-column" onSubmit={handleSubmit}>
+          <div className="section-heading">
+            <div>
+              <h2>Create user</h2>
+              <p className="muted">
+                Add a username and access level. Activation and password setup are
+                requested separately.
+              </p>
+            </div>
+          </div>
+          <label className="field">
+            <span>Username</span>
+            <input
+              required
+              minLength={3}
+              maxLength={32}
+              value={form.username}
+              onChange={(event) => setForm({ ...form, username: event.target.value })}
+              placeholder="family.member"
+            />
+          </label>
+          <label className="field">
+            <span>Role</span>
+            <select
+              value={form.role}
+              onChange={(event) =>
+                setForm({ ...form, role: event.target.value as UserRole })
+              }
+            >
+              <option value={UserRole.USER}>User</option>
+              <option value={UserRole.ADMIN}>Admin</option>
+            </select>
+          </label>
+          <label className="toggle-field">
+            <input
+              type="checkbox"
+              checked={form.isActive}
+              onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+            />
+            <span>Active</span>
+          </label>
+          <button type="submit" disabled={isSaving}>
+            {isSaving ? "Creating..." : "Create user"}
+          </button>
+          {error ? (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          ) : null}
+          {statusMessage ? (
+            <p className="success" role="status">
+              {statusMessage}
+            </p>
+          ) : null}
+        </form>
+
+        <div className="card stack">
+          <div className="section-heading">
+            <div>
+              <h2>User directory</h2>
+              <p className="muted">
+                {activeAdminCount} active admin{activeAdminCount === 1 ? "" : "s"} available.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="ghost-button compact-button"
+              onClick={() => void loadUsers()}
+              disabled={isLoading}
+            >
+              {isLoading ? "Loading..." : "Refresh"}
+            </button>
+          </div>
+          {isLoading ? <div className="placeholder">Loading users...</div> : null}
+          {!isLoading && users.length === 0 ? (
+            <div className="placeholder">No managed users are available yet.</div>
+          ) : null}
+          <div className="user-directory-list">
+            {users.map((user) => (
+              <UserRecordCard
+                key={user.id}
+                user={user}
+                isUpdating={updatingUserId === user.id}
+                requestingUserId={requestingUserId}
+                onRoleChange={(role) => void updateUser(user, { role })}
+                onStatusChange={(isActive) => void updateUser(user, { isActive })}
+                onRequestActivation={() =>
+                  void requestUserAction(user, "activation-request")
+                }
+                onRequestPasswordReset={() =>
+                  void requestUserAction(user, "password-reset-request")
+                }
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function formatUserActionStatus(
+  username: string,
+  action: "activation-request" | "password-reset-request",
+  delivery?: string,
+) {
+  if (delivery === "pending_self_managed_onboarding") {
+    return `${username} is waiting for the self-managed onboarding flow; no password was issued.`;
+  }
+
+  return action === "activation-request"
+    ? `Activation requested for ${username}.`
+    : `Password reset requested for ${username}.`;
+}
+
+function UserRecordCard({
+  user,
+  isUpdating,
+  requestingUserId,
+  onRoleChange,
+  onStatusChange,
+  onRequestActivation,
+  onRequestPasswordReset,
+}: {
+  user: ManagedUserRecord;
+  isUpdating: boolean;
+  requestingUserId: string | null;
+  onRoleChange: (role: UserRole) => void;
+  onStatusChange: (isActive: boolean) => void;
+  onRequestActivation: () => void;
+  onRequestPasswordReset: () => void;
+}) {
+  const activationRequestId = `${user.id}:activation-request`;
+  const passwordResetRequestId = `${user.id}:password-reset-request`;
+
+  return (
+    <article className="resource-card user-card stack">
+      <div className="section-heading">
+        <div>
+          <h3>{user.username}</h3>
+          <p className="muted">Last login {formatNullableDateTime(user.lastLoginAt)}</p>
+        </div>
+        <span
+          className={`status-pill ${
+            user.isActive ? "status-complete" : "status-incomplete"
+          }`}
+        >
+          {user.isActive ? "Active" : "Inactive"}
+        </span>
+      </div>
+      <dl className="detail-grid">
+        <div>
+          <dt>Role</dt>
+          <dd>{formatEnumLabel(user.role)}</dd>
+        </div>
+        <div>
+          <dt>Session version</dt>
+          <dd>{user.sessionVersion}</dd>
+        </div>
+        <div>
+          <dt>Created</dt>
+          <dd>{formatDateTime(user.createdAt)}</dd>
+        </div>
+      </dl>
+      <div className="user-card-controls">
+        <label className="field">
+          <span>Role</span>
+          <select
+            value={user.role}
+            disabled={isUpdating}
+            onChange={(event) => onRoleChange(event.target.value as UserRole)}
+          >
+            <option value={UserRole.USER}>User</option>
+            <option value={UserRole.ADMIN}>Admin</option>
+          </select>
+        </label>
+        <label className="toggle-field">
+          <input
+            type="checkbox"
+            checked={user.isActive}
+            disabled={isUpdating}
+            onChange={(event) => onStatusChange(event.target.checked)}
+          />
+          <span>Active</span>
+        </label>
+      </div>
+      <div className="account-card-actions">
+        <button
+          type="button"
+          className="ghost-button compact-button"
+          disabled={requestingUserId === activationRequestId}
+          onClick={onRequestActivation}
+        >
+          {requestingUserId === activationRequestId
+            ? "Requesting..."
+            : "Request activation"}
+        </button>
+        <button
+          type="button"
+          className="ghost-button compact-button"
+          disabled={requestingUserId === passwordResetRequestId}
+          onClick={onRequestPasswordReset}
+        >
+          {requestingUserId === passwordResetRequestId
+            ? "Requesting..."
+            : "Request password reset"}
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -1920,6 +2316,10 @@ function formatDateTime(value: string) {
     timeStyle: "short",
     timeZone: "UTC",
   });
+}
+
+function formatNullableDateTime(value: string | null) {
+  return value ? formatDateTime(value) : "never";
 }
 
 function mergeLatestPriceRecord(currentRecords: PriceRecord[], nextRecord: PriceRecord) {

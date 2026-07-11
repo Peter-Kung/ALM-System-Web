@@ -4,18 +4,20 @@ import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
 
 import { AppShellFrame, type WorkspaceSummary } from "@/components/app-shell-frame";
+import type { NavigationRole } from "@/lib/navigation";
 
 type AppShellProps = {
   children: ReactNode;
+  role: NavigationRole;
   username: string;
   summary: WorkspaceSummary;
 };
 
-export function AppShell({ children, username, summary }: AppShellProps) {
+export function AppShell({ children, role, username, summary }: AppShellProps) {
   const pathname = usePathname();
 
   return (
-    <AppShellFrame pathname={pathname} username={username} summary={summary}>
+    <AppShellFrame pathname={pathname} role={role} username={username} summary={summary}>
       {children}
     </AppShellFrame>
   );

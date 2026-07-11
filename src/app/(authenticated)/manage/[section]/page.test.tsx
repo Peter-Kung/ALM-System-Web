@@ -4,7 +4,9 @@ import test from "node:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import ManagementSectionPage from "@/app/(authenticated)/manage/[section]/page";
+import ManagementSectionPage, {
+  canCurrentUserAccessManagementSection,
+} from "@/app/(authenticated)/manage/[section]/page";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 
 test("manage accounts route renders the account editor and list regions", async () => {
@@ -30,6 +32,10 @@ test("manage section route returns not found for unknown sections", async () => 
     }),
     hasNotFoundDigest,
   );
+});
+
+test("regular management sections remain accessible without admin session checks", async () => {
+  assert.equal(await canCurrentUserAccessManagementSection("accounts"), true);
 });
 
 function hasNotFoundDigest(error: unknown) {

@@ -15,7 +15,7 @@ import {
   getAccountActionLabel,
 } from "@/components/management-section";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
-import { AccountType, AssetPriceSourceType, AssetType } from "@prisma/client";
+import { AccountType, AssetPriceSourceType, AssetType, UserRole } from "@prisma/client";
 
 type DomGlobals = Pick<
   typeof globalThis,
@@ -225,6 +225,92 @@ test("prices management section keeps price actions in the sticky form column", 
   assert.match(markup, /Automatic refresh/);
   assert.match(markup, /Manual entry/);
   assertStickyActionColumn(markup, ["Automatic refresh", "Manual entry"], "Latest price status");
+});
+
+test("users management section renders admin controls without password fields", () => {
+  const markup = renderToStaticMarkup(
+    <WorkspaceMutationBoundary>
+      <ManagementSection section="users" />
+    </WorkspaceMutationBoundary>,
+  );
+
+  assert.match(markup, /User management/);
+  assert.match(markup, /Create user/);
+  assert.match(markup, /User directory/);
+  assert.doesNotMatch(markup, /Temporary password/);
+  assert.doesNotMatch(markup, /type="password"/);
+  assertStickyActionColumn(markup, "Create user", "User directory");
+});
+
+test("users management actions show pending self-managed onboarding status", async () => {
+  const { document, root, restore } = createDom();
+  const previousFetch = globalThis.fetch;
+
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input);
+
+    if (url === "/api/admin/users" && init === undefined) {
+      return Response.json({
+        users: [
+          {
+            id: "user-member",
+            username: "member",
+            role: UserRole.USER,
+            isActive: true,
+            sessionVersion: 0,
+            lastLoginAt: null,
+            createdAt: "2026-07-11T00:00:00.000Z",
+            updatedAt: "2026-07-11T00:00:00.000Z",
+          },
+        ],
+      });
+    }
+
+    if (
+      url === "/api/admin/users/user-member/activation-request" &&
+      init?.method === "POST"
+    ) {
+      return Response.json(
+        { delivery: "pending_self_managed_onboarding" },
+        { status: 202 },
+      );
+    }
+
+    throw new Error(`Unexpected fetch request: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    await act(async () => {
+      root.render(
+        <WorkspaceMutationBoundary>
+          <ManagementSection section="users" />
+        </WorkspaceMutationBoundary>,
+      );
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    const activationButton = Array.from(document.querySelectorAll("button")).find(
+      (button) => button.textContent === "Request activation",
+    );
+    assert.ok(activationButton);
+
+    await act(async () => {
+      activationButton.click();
+      await Promise.resolve();
+    });
+    await flushEffects();
+
+    assert.match(
+      document.body.textContent ?? "",
+      /member is waiting for the self-managed onboarding flow; no password was issued\./,
+    );
+    assert.doesNotMatch(document.body.textContent ?? "", /Activation requested for member/);
+  } finally {
+    globalThis.fetch = previousFetch;
+    await unmount(root);
+    restore();
+  }
 });
 
 test("assets management flow saves and displays real estate assets", async () => {

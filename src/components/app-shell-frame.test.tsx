@@ -9,6 +9,7 @@ test("app shell frame renders the summary region, grouped nav, and footer action
   const markup = renderToStaticMarkup(
     <AppShellFrame
       pathname="/manage/accounts"
+      role="ADMIN"
       username="owner"
       summary={{
         latestSnapshotLabel: "Latest snapshot Jul 9, 2026",
@@ -30,6 +31,7 @@ test("app shell frame renders the summary region, grouped nav, and footer action
   assert.match(markup, /Dashboard/);
   assert.match(markup, /Data/);
   assert.match(markup, /Workflow/);
+  assert.match(markup, /Users/);
   assert.match(markup, /Settings/);
   assert.match(markup, /Sign out/);
   assert.match(markup, /nav-link nav-link-active/);
@@ -39,6 +41,7 @@ test("app shell frame shows latest snapshot financial context in the sidebar sum
   const markup = renderToStaticMarkup(
     <AppShellFrame
       pathname="/dashboard"
+      role="USER"
       username="owner"
       summary={{
         latestSnapshotLabel: "Latest snapshot Jul 9, 2026, 7:15 PM",
@@ -74,6 +77,7 @@ test("app shell frame renders the sidebar summary before the first snapshot", ()
   const markup = renderToStaticMarkup(
     <AppShellFrame
       pathname="/dashboard"
+      role="USER"
       username="owner"
       summary={{
         latestSnapshotLabel: "No snapshot saved yet",
@@ -97,4 +101,30 @@ test("app shell frame renders the sidebar summary before the first snapshot", ()
   assert.match(markup, /No snapshot saved yet/);
   assert.match(markup, /No data/);
   assert.match(markup, /Run the first valuation preview to populate the workspace pulse\./);
+});
+
+test("app shell frame hides admin navigation from regular users", () => {
+  const markup = renderToStaticMarkup(
+    <AppShellFrame
+      pathname="/dashboard"
+      role="USER"
+      username="member"
+      summary={{
+        latestSnapshotLabel: "No snapshot saved yet",
+        netWorthLabel: "Awaiting baseline",
+        snapshotStatusLabel: "Not started",
+        metricRows: [
+          { label: "Cash", value: "No data" },
+          { label: "Investments", value: "No data" },
+          { label: "Debt", value: "No data" },
+        ],
+        reminderLabel: "Run the first valuation preview to populate the workspace pulse.",
+      }}
+    >
+      <section>Dashboard content</section>
+    </AppShellFrame>,
+  );
+
+  assert.doesNotMatch(markup, /Users/);
+  assert.doesNotMatch(markup, /Admin/);
 });

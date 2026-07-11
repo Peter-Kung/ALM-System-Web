@@ -626,6 +626,23 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.user-directory-list,
+.user-card-controls {
+  display: grid;
+  gap: 1rem;
+}
+
+.user-card {
+  background:
+    linear-gradient(145deg, rgba(125, 143, 90, 0.1), rgba(255, 255, 255, 0)),
+    var(--panel);
+}
+
+.user-card-controls {
+  grid-template-columns: minmax(10rem, 1fr) auto;
+  align-items: end;
+}
+
 .dashboard-hero {
   display: grid;
   gap: 1rem;
@@ -925,6 +942,7 @@ button:disabled {
   .deployment-update-form,
   .management-grid,
   .management-highlight-grid,
+  .user-card-controls,
   .field-row,
   .dashboard-hero,
   .dashboard-grid-secondary,

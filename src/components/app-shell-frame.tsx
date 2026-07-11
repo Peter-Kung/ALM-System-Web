@@ -3,7 +3,11 @@ import React from "react";
 import { ReactNode } from "react";
 import type { Route } from "next";
 
-import { footerNavigation, primaryNavigation } from "@/lib/navigation";
+import {
+  footerNavigation,
+  getPrimaryNavigationForRole,
+  type NavigationRole,
+} from "@/lib/navigation";
 
 export type WorkspaceSummary = {
   latestSnapshotLabel: string;
@@ -19,6 +23,7 @@ export type WorkspaceSummary = {
 type AppShellFrameProps = {
   children: ReactNode;
   pathname: string;
+  role: NavigationRole;
   username: string;
   summary: WorkspaceSummary;
 };
@@ -26,9 +31,12 @@ type AppShellFrameProps = {
 export function AppShellFrame({
   children,
   pathname,
+  role,
   username,
   summary,
 }: AppShellFrameProps) {
+  const primaryNavigation = getPrimaryNavigationForRole(role);
+
   return (
     <div className="shell">
       <aside className="sidebar">

@@ -33,6 +33,7 @@ export default async function AuthenticatedLayout({
   const dashboard = await createDashboardSummaryForUser(validSession.sub);
   return (
     <AppShell
+      role={validSession.role}
       username={validSession.username}
       summary={buildWorkspaceSummary(dashboard.sidebarSummary)}
     >
