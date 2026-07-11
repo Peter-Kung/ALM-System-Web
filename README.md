@@ -1,8 +1,9 @@
 # ALM System Web
 
-ALM System Web is a private single-user net worth app. It stores editable
-accounts, assets, holdings, liabilities, and price records, then turns those
-inputs into immutable valuation snapshots for dashboard reporting.
+ALM System Web is a private multi-user net worth app. It stores editable
+accounts, assets, holdings, liabilities, and price records per signed-in user,
+then turns those inputs into immutable valuation snapshots for dashboard
+reporting.
 
 Use this README to choose an installation path. For product behavior details
 and the full documentation index, start with [docs/index.md](docs/index.md).
@@ -62,19 +63,35 @@ listed in [Docker Compose deployment](docs/deployment.md#requirements).
 6. Open `http://localhost:3000`.
 
 This repo requires `DATABASE_URL` to be set for Prisma commands and app
-runtime. In development, the app falls back to these initial owner bootstrap
-and session defaults when you do not set environment variables:
+runtime. In development, the app falls back to these defaults when you do not
+set environment variables:
 
-- Username: `owner`
-- Password: `change-me`
+- Setup token: `setup-token`
+- Legacy fixed username: `owner`
+- Legacy fixed password: `change-me`
 - Session secret: `development-session-secret-change-me`
 
-You can override the initial owner bootstrap credentials with `APP_USERNAME`
-and `APP_PASSWORD`, and override runtime configuration with `SESSION_SECRET`
-and `DATABASE_URL`. After the owner account has a stored password hash, normal
-sign-ins use the account credentials in the database. The `APP_USERNAME` and
-`APP_PASSWORD` values remain compatibility inputs for initialization or upgrade
-when no stored password hash exists yet.
+You can override bootstrap and runtime configuration with:
+
+- `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` for the configured first admin
+- `APP_SETUP_TOKEN` for the one-time setup route
+- `SESSION_SECRET` and `DATABASE_URL` for runtime configuration
+
+Set `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` together. If only one is set,
+the app raises a configuration error instead of falling back to setup.
+
+If `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` are set and the database has
+no users yet, the app creates that first administrator before normal sign-in.
+Those values also support the legacy fixed-credential upgrade path when the
+existing owner record still has no stored password hash. In other cases, use
+the existing database-backed accounts as-is. If no configured administrator is
+present and the database still has no users, complete first-run setup at
+`/setup` instead.
+
+The legacy `APP_USERNAME` and `APP_PASSWORD` values remain compatibility inputs
+only when an existing deployment upgrades from the older fixed-credential
+single-user model. After a user has a stored password hash, normal sign-ins
+always use the database-backed user credentials.
 
 ## Self-hosted Docker deployment
 
@@ -100,26 +117,43 @@ deployment flow.
 
 1. Open `http://localhost:3000`.
 2. The app redirects protected routes to `/login`.
-3. Sign in with the owner credentials. On the first successful sign-in, the app
-   stores the owner password hash in the database and later sign-ins use the
-   stored account credentials.
-
-By default, when `APP_USERNAME` and `APP_PASSWORD` are unset, use:
-
-   - Username: `owner`
-   - Password: `change-me`
+3. If `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` are configured before the
+   first user exists, sign in at `/login` with that administrator account.
+4. If no users exist and no configured administrator is bootstrapped, open
+   `/setup`, enter the setup token, and create the first administrator account.
+5. After setup completes, sign in at `/login` with a database-backed user.
 
 After a successful sign-in, the app redirects to the dashboard.
 
 ## Account settings
 
-The app remains a single-user workspace. The signed-in owner can change the
-username, password, or both from `Settings` > `Account`.
+Every signed-in user can change their own username, password, or both from
+`Settings` > `Account`. Administrators also get deployment controls and the
+`Users` management area.
 
 Credential changes require the current password. Password changes also require
 a matching confirmation value. After a successful credential change, the app
-clears the current session and redirects to `/login`. Sign in again with the
-updated username or password.
+clears the current session and redirects to `/login`. Password changes also
+increment the user's session version, so existing JWT sessions become invalid.
+Sign in again with the updated username or password.
+
+## User roles and access
+
+- `ADMIN` users can manage users from `/manage/users` and access deployment
+  update controls.
+- `USER` users can manage only their own financial workspace data.
+- The `Users` navigation entry is visible only to `ADMIN` users.
+- User-management APIs return `403 Forbidden` to non-admin requests.
+
+Administrators can create users, change roles, activate users, deactivate
+users, and request password reset or activation handoffs. Deactivation does not
+delete a user's financial data. The app prevents changes that would leave no
+active admin.
+
+User deactivation invalidates existing JWT sessions immediately. Password reset
+requests currently return a pending self-managed onboarding response rather than
+changing the password directly. A deactivated user cannot sign in again until
+an administrator reactivates the account.
 
 ## Local usage flow
 
@@ -129,7 +163,8 @@ need.
 ### 1. Create accounts
 
 Go to `Accounts` and create the cash and investment accounts you want to track.
-Each account stores:
+Each signed-in user sees and edits only their own accounts. Each account
+stores:
 
 - Name and institution name
 - Account type
@@ -141,7 +176,7 @@ Each account stores:
 ### 2. Create assets
 
 Go to `Assets` and define the instruments that holdings will reference. Each
-asset stores:
+signed-in user sees and edits only their own assets. Each asset stores:
 
 - Name
 - Asset type
@@ -161,15 +196,17 @@ equal to the current estimate.
 
 Go to `Holdings` and link each asset to an account with a quantity. The page
 requires at least one account and one asset before it can create holdings.
+Holdings stay isolated to the signed-in user.
 
 ### 4. Create liabilities
 
 Go to `Liabilities` and record mortgage or personal loan balances, monthly
-payments, dates, and the optional payment account link.
+payments, dates, and the optional payment account link. Liabilities stay
+isolated to the signed-in user.
 
 ### 5. Add prices
 
-Go to `Prices`.
+Go to `Prices`. Price records stay isolated to the signed-in user.
 
 - Use `Refresh prices` to fetch new records for active auto-priced assets.
 - Use the manual price form to save a price for active manual-priced assets.
@@ -194,7 +231,8 @@ The preview shows:
 
 From the valuation page, use `Confirm snapshot` to save an immutable snapshot.
 The saved snapshot keeps the valuation result and its historical labels even if
-you later edit the live master data.
+you later edit the live master data. Snapshots stay isolated to the signed-in
+user.
 
 ### 8. Review the dashboard and snapshot history
 
