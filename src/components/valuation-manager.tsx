@@ -188,65 +188,67 @@ export function ValuationManager() {
         </p>
       </div>
       <div className="management-grid">
-        <form className="card stack" onSubmit={handlePreview}>
-          <div className="section-heading">
-            <div>
-              <h2>Preview inputs</h2>
-              <p className="muted">
-                Base currency is fixed to {VALUATION_BASE_CURRENCY}. Enter rates only
-                for non-{VALUATION_BASE_CURRENCY} currencies in active data or valid
-                price records.
-              </p>
+        <div className="management-form-column">
+          <form className="card stack" onSubmit={handlePreview}>
+            <div className="section-heading">
+              <div>
+                <h2>Preview inputs</h2>
+                <p className="muted">
+                  Base currency is fixed to {VALUATION_BASE_CURRENCY}. Enter rates only
+                  for non-{VALUATION_BASE_CURRENCY} currencies in active data or valid
+                  price records.
+                </p>
+              </div>
             </div>
-          </div>
-          {isLoading ? <div className="placeholder">Loading valuation inputs...</div> : null}
-          {!isLoading && currencies.length === 0 ? (
-            <div className="placeholder">
-              No non-{VALUATION_BASE_CURRENCY} currencies are required right now.
-              You can still run a preview.
-            </div>
-          ) : null}
-          {!isLoading
-            ? currencies.map((currency) => {
-                const rateResult = fxRateResults[currency];
+            {isLoading ? <div className="placeholder">Loading valuation inputs...</div> : null}
+            {!isLoading && currencies.length === 0 ? (
+              <div className="placeholder">
+                No non-{VALUATION_BASE_CURRENCY} currencies are required right now.
+                You can still run a preview.
+              </div>
+            ) : null}
+            {!isLoading
+              ? currencies.map((currency) => {
+                  const rateResult = fxRateResults[currency];
 
-                return (
-                  <label key={currency} className="field">
-                    <span>{currency} to {VALUATION_BASE_CURRENCY}</span>
-                    <input
-                      name={`fxRate.${currency}`}
-                      type="number"
-                      step="0.0001"
-                      min="0.0001"
-                      value={fxRates[currency] ?? ""}
-                      onChange={(event) =>
-                        setFxRates((currentRates) => ({
-                          ...currentRates,
-                          [currency]: event.target.value,
-                        }))
-                      }
-                      placeholder={`1 ${currency} = ? ${VALUATION_BASE_CURRENCY}`}
-                    />
-                    {rateResult ? (
-                      <span className="muted">{formatFxRateResult(rateResult)}</span>
-                    ) : null}
-                  </label>
-                );
-              })
-            : null}
-          {error ? <p className="error">{error}</p> : null}
-          {confirmationMessage ? <p className="muted">{confirmationMessage}</p> : null}
-          <button type="submit" disabled={isLoading || isPreviewing}>
-            {isPreviewing ? "Running preview..." : "Run valuation preview"}
-          </button>
-          <button
-            type="button"
-            disabled={!preview || isConfirming || isPreviewing}
-            onClick={() => void handleConfirmSnapshot()}
-          >
-            {isConfirming ? "Saving snapshot..." : "Confirm snapshot"}
-          </button>
-        </form>
+                  return (
+                    <label key={currency} className="field">
+                      <span>{currency} to {VALUATION_BASE_CURRENCY}</span>
+                      <input
+                        name={`fxRate.${currency}`}
+                        type="number"
+                        step="0.0001"
+                        min="0.0001"
+                        value={fxRates[currency] ?? ""}
+                        onChange={(event) =>
+                          setFxRates((currentRates) => ({
+                            ...currentRates,
+                            [currency]: event.target.value,
+                          }))
+                        }
+                        placeholder={`1 ${currency} = ? ${VALUATION_BASE_CURRENCY}`}
+                      />
+                      {rateResult ? (
+                        <span className="muted">{formatFxRateResult(rateResult)}</span>
+                      ) : null}
+                    </label>
+                  );
+                })
+              : null}
+            {error ? <p className="error">{error}</p> : null}
+            {confirmationMessage ? <p className="muted">{confirmationMessage}</p> : null}
+            <button type="submit" disabled={isLoading || isPreviewing}>
+              {isPreviewing ? "Running preview..." : "Run valuation preview"}
+            </button>
+            <button
+              type="button"
+              disabled={!preview || isConfirming || isPreviewing}
+              onClick={() => void handleConfirmSnapshot()}
+            >
+              {isConfirming ? "Saving snapshot..." : "Confirm snapshot"}
+            </button>
+          </form>
+        </div>
         <div className="stack">
           <div className="section-heading">
             <h2>Preview result</h2>

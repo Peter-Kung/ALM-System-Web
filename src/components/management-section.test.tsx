@@ -109,6 +109,32 @@ function getResourceCardByHeading(document: Document, headingText: string) {
   return card;
 }
 
+function assertStickyActionColumn(
+  markup: string,
+  actionText: string | string[],
+  listText: string,
+) {
+  const dom = new JSDOM(markup);
+  const grid = dom.window.document.querySelector(".management-grid");
+  assert.ok(grid, "Expected management grid to exist");
+
+  const [actionColumn, listColumn] = Array.from(grid.children);
+  assert.ok(actionColumn, "Expected management grid to have an action column");
+  assert.ok(listColumn, "Expected management grid to have a list column");
+  assert.ok(
+    actionColumn.classList.contains("management-form-column"),
+    "Expected first management grid column to stay sticky on desktop",
+  );
+  for (const expectedActionText of [actionText].flat()) {
+    assert.match(actionColumn.textContent ?? "", new RegExp(expectedActionText));
+  }
+  assert.ok(
+    !listColumn.classList.contains("management-form-column"),
+    "Expected list column to remain normal document flow",
+  );
+  assert.match(listColumn.textContent ?? "", new RegExp(listText));
+}
+
 test("accounts management section renders the split editor and card-list template", () => {
   const markup = renderToStaticMarkup(
     <WorkspaceMutationBoundary>
@@ -153,6 +179,52 @@ test("assets management section keeps the editor in the sticky form column", () 
   assert.match(markup, /management-form-column/);
   assert.match(markup, /Add asset/);
   assert.match(markup, /Existing assets/);
+  assertStickyActionColumn(markup, "Add asset", "Existing assets");
+});
+
+test("holdings management section keeps the editor in the sticky form column", () => {
+  const markup = renderToStaticMarkup(
+    <WorkspaceMutationBoundary>
+      <ManagementSection section="holdings" />
+    </WorkspaceMutationBoundary>,
+  );
+
+  assert.match(markup, /Holding management/);
+  assert.match(markup, /management-grid/);
+  assert.match(markup, /management-form-column/);
+  assert.match(markup, /Add holding/);
+  assert.match(markup, /Existing holdings/);
+  assertStickyActionColumn(markup, "Add holding", "Existing holdings");
+});
+
+test("liabilities management section keeps the editor in the sticky form column", () => {
+  const markup = renderToStaticMarkup(
+    <WorkspaceMutationBoundary>
+      <ManagementSection section="liabilities" />
+    </WorkspaceMutationBoundary>,
+  );
+
+  assert.match(markup, /Liability management/);
+  assert.match(markup, /management-grid/);
+  assert.match(markup, /management-form-column/);
+  assert.match(markup, /Add liability/);
+  assert.match(markup, /Existing liabilities/);
+  assertStickyActionColumn(markup, "Add liability", "Existing liabilities");
+});
+
+test("prices management section keeps price actions in the sticky form column", () => {
+  const markup = renderToStaticMarkup(
+    <WorkspaceMutationBoundary>
+      <ManagementSection section="prices" />
+    </WorkspaceMutationBoundary>,
+  );
+
+  assert.match(markup, /Price records/);
+  assert.match(markup, /management-grid/);
+  assert.match(markup, /management-form-column/);
+  assert.match(markup, /Automatic refresh/);
+  assert.match(markup, /Manual entry/);
+  assertStickyActionColumn(markup, ["Automatic refresh", "Manual entry"], "Latest price status");
 });
 
 test("assets management flow saves and displays real estate assets", async () => {

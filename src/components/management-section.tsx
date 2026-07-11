@@ -1046,84 +1046,86 @@ function HoldingsManager() {
         </p>
       </div>
       <div className="management-grid">
-        <form className="card stack" onSubmit={handleSubmit}>
-          <div className="section-heading">
-            <h2>{editingId ? "Edit holding" : "Add holding"}</h2>
-            {editingId ? (
-              <button type="button" className="ghost-button compact-button" onClick={reset}>
-                Cancel
-              </button>
+        <div className="management-form-column">
+          <form className="card stack" onSubmit={handleSubmit}>
+            <div className="section-heading">
+              <h2>{editingId ? "Edit holding" : "Add holding"}</h2>
+              {editingId ? (
+                <button type="button" className="ghost-button compact-button" onClick={reset}>
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+            <label className="field">
+              <span>Account</span>
+              <select
+                value={form.accountId}
+                onChange={(event) => setForm({ ...form, accountId: event.target.value })}
+                disabled={!canManageHoldings}
+              >
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} · {account.institutionName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Asset</span>
+              <select
+                value={form.assetId}
+                onChange={(event) => setForm({ ...form, assetId: event.target.value })}
+                disabled={!canManageHoldings}
+              >
+                {assets.map((asset) => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.name}
+                    {asset.symbol ? ` · ${asset.symbol}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Quantity</span>
+              <input
+                type="number"
+                step="0.0001"
+                min="0.0001"
+                value={form.quantity}
+                onChange={(event) => setForm({ ...form, quantity: event.target.value })}
+                disabled={!canManageHoldings}
+                required
+              />
+            </label>
+            <label className="field">
+              <span>Notes</span>
+              <textarea
+                value={form.notes}
+                onChange={(event) => setForm({ ...form, notes: event.target.value })}
+                rows={4}
+                disabled={!canManageHoldings}
+              />
+            </label>
+            <label className="toggle-field">
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
+                disabled={!canManageHoldings}
+              />
+              <span>Active holding</span>
+            </label>
+            {!canManageHoldings ? (
+              <p className="muted">
+                Create at least one account and one asset before adding holdings.
+              </p>
             ) : null}
-          </div>
-          <label className="field">
-            <span>Account</span>
-            <select
-              value={form.accountId}
-              onChange={(event) => setForm({ ...form, accountId: event.target.value })}
-              disabled={!canManageHoldings}
-            >
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name} · {account.institutionName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Asset</span>
-            <select
-              value={form.assetId}
-              onChange={(event) => setForm({ ...form, assetId: event.target.value })}
-              disabled={!canManageHoldings}
-            >
-              {assets.map((asset) => (
-                <option key={asset.id} value={asset.id}>
-                  {asset.name}
-                  {asset.symbol ? ` · ${asset.symbol}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Quantity</span>
-            <input
-              type="number"
-              step="0.0001"
-              min="0.0001"
-              value={form.quantity}
-              onChange={(event) => setForm({ ...form, quantity: event.target.value })}
-              disabled={!canManageHoldings}
-              required
-            />
-          </label>
-          <label className="field">
-            <span>Notes</span>
-            <textarea
-              value={form.notes}
-              onChange={(event) => setForm({ ...form, notes: event.target.value })}
-              rows={4}
-              disabled={!canManageHoldings}
-            />
-          </label>
-          <label className="toggle-field">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
-              disabled={!canManageHoldings}
-            />
-            <span>Active holding</span>
-          </label>
-          {!canManageHoldings ? (
-            <p className="muted">
-              Create at least one account and one asset before adding holdings.
-            </p>
-          ) : null}
-          {error ? <p className="error">{error}</p> : null}
-          <button type="submit" disabled={isSaving || !canManageHoldings}>
-            {isSaving ? "Saving..." : editingId ? "Save holding" : "Create holding"}
-          </button>
-        </form>
+            {error ? <p className="error">{error}</p> : null}
+            <button type="submit" disabled={isSaving || !canManageHoldings}>
+              {isSaving ? "Saving..." : editingId ? "Save holding" : "Create holding"}
+            </button>
+          </form>
+        </div>
         <div className="stack">
           <div className="section-heading">
             <h2>Existing holdings</h2>
@@ -1305,7 +1307,7 @@ function LiabilitiesManager() {
         </p>
       </div>
       <div className="management-grid">
-        <form className="card stack" onSubmit={handleSubmit}>
+        <form className="card stack management-form-column" onSubmit={handleSubmit}>
           <div className="section-heading">
             <h2>{editingId ? "Edit liability" : "Add liability"}</h2>
             {editingId ? (
@@ -1701,7 +1703,7 @@ function PricesManager() {
         </p>
       </div>
       <div className="management-grid">
-        <div className="stack">
+        <div className="stack management-form-column">
           <div className="card stack">
             <div className="section-heading">
               <div>
