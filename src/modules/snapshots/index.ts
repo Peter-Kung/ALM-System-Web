@@ -2,7 +2,7 @@ export const snapshotsModule = {
   name: "snapshots",
 };
 
-export { createSnapshotRepository } from "./repository";
+export { createSnapshotRepository, type SnapshotTrendRecord } from "./repository";
 export {
   buildSnapshotCreateInput,
   confirmSnapshotFromPreviewInput,

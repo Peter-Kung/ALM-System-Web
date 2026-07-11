@@ -250,24 +250,90 @@ test("buildDashboardSummary reports trend deltas and incomplete issue messages",
   ]);
 
   assert.deepEqual(summary.trend, {
-    previousSnapshotAt: "2026-07-01T00:00:00.000Z",
+    firstSelectableDate: "2026-07-01",
+    latestSelectableDate: "2026-07-08",
+    defaultSelectedDate: "2026-07-08",
+    selectedDate: "2026-07-08",
+    previousDate: "2026-07-07",
     netWorthChange: "80.00",
     totalAssetsChange: "100.00",
     totalLiabilitiesChange: "20.00",
     monthlyDebtPaymentChange: "5.00",
+    visiblePoints: [
+      {
+        date: "2026-07-08",
+        snapshotAt: "2026-07-08T00:00:00.000Z",
+        netWorth: "880.00",
+        totalAssets: "1300.00",
+        totalLiabilities: "420.00",
+        monthlyDebtPaymentTotal: "125.00",
+      },
+    ],
   });
   assert.deepEqual(summary.trendSeries, [
     {
+      date: "2026-07-01",
       snapshotAt: "2026-07-01T00:00:00.000Z",
       netWorth: "800.00",
       totalAssets: "1200.00",
       totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
     },
     {
+      date: "2026-07-02",
+      snapshotAt: "2026-07-01T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+    {
+      date: "2026-07-03",
+      snapshotAt: "2026-07-01T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+    {
+      date: "2026-07-04",
+      snapshotAt: "2026-07-01T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+    {
+      date: "2026-07-05",
+      snapshotAt: "2026-07-01T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+    {
+      date: "2026-07-06",
+      snapshotAt: "2026-07-01T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+    {
+      date: "2026-07-07",
+      snapshotAt: "2026-07-01T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+    {
+      date: "2026-07-08",
       snapshotAt: "2026-07-08T00:00:00.000Z",
       netWorth: "880.00",
       totalAssets: "1300.00",
       totalLiabilities: "420.00",
+      monthlyDebtPaymentTotal: "125.00",
     },
   ]);
   assert.deepEqual(summary.issueMessages, [
@@ -285,6 +351,212 @@ test("buildDashboardSummary reports trend deltas and incomplete issue messages",
     hasTrend: true,
     netWorthDirection: "positive",
   });
+});
+
+test("buildDashboardSummary builds continuous daily trend data", () => {
+  const summary = buildDashboardSummary(
+    [
+      createSnapshot({
+        id: "snapshot-4",
+        totalAssets: decimal("1600.00"),
+        totalLiabilities: decimal("430.00"),
+        netWorth: decimal("1170.00"),
+        monthlyDebtPaymentTotal: decimal("130.00"),
+        snapshotAt: new Date("2026-07-08T15:00:00.000Z"),
+        createdAt: new Date("2026-07-08T15:00:00.000Z"),
+      }),
+      createSnapshot({
+        id: "snapshot-3",
+        totalAssets: decimal("1500.00"),
+        totalLiabilities: decimal("450.00"),
+        netWorth: decimal("1050.00"),
+        monthlyDebtPaymentTotal: decimal("125.00"),
+        snapshotAt: new Date("2026-07-08T09:00:00.000Z"),
+        createdAt: new Date("2026-07-08T09:00:00.000Z"),
+      }),
+      createSnapshot({
+        id: "snapshot-2",
+        totalAssets: decimal("1400.00"),
+        totalLiabilities: decimal("420.00"),
+        netWorth: decimal("980.00"),
+        monthlyDebtPaymentTotal: decimal("120.00"),
+        snapshotAt: new Date("2026-07-05T12:00:00.000Z"),
+        createdAt: new Date("2026-07-05T12:00:00.000Z"),
+      }),
+      createSnapshot({
+        id: "snapshot-1",
+        totalAssets: decimal("1200.00"),
+        totalLiabilities: decimal("400.00"),
+        netWorth: decimal("800.00"),
+        monthlyDebtPaymentTotal: decimal("110.00"),
+        snapshotAt: new Date("2026-07-01T00:00:00.000Z"),
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+      }),
+    ],
+    { selectedDate: "2026-07-04" },
+  );
+
+  assert.deepEqual(summary.trend, {
+    firstSelectableDate: "2026-07-01",
+    latestSelectableDate: "2026-07-08",
+    defaultSelectedDate: "2026-07-08",
+    selectedDate: "2026-07-04",
+    previousDate: "2026-07-03",
+    netWorthChange: "0.00",
+    totalAssetsChange: "0.00",
+    totalLiabilitiesChange: "0.00",
+    monthlyDebtPaymentChange: "0.00",
+    visiblePoints: [
+      {
+        date: "2026-07-04",
+        snapshotAt: "2026-07-01T00:00:00.000Z",
+        netWorth: "800.00",
+        totalAssets: "1200.00",
+        totalLiabilities: "400.00",
+        monthlyDebtPaymentTotal: "110.00",
+      },
+      {
+        date: "2026-07-05",
+        snapshotAt: "2026-07-05T12:00:00.000Z",
+        netWorth: "980.00",
+        totalAssets: "1400.00",
+        totalLiabilities: "420.00",
+        monthlyDebtPaymentTotal: "120.00",
+      },
+      {
+        date: "2026-07-06",
+        snapshotAt: "2026-07-05T12:00:00.000Z",
+        netWorth: "980.00",
+        totalAssets: "1400.00",
+        totalLiabilities: "420.00",
+        monthlyDebtPaymentTotal: "120.00",
+      },
+      {
+        date: "2026-07-07",
+        snapshotAt: "2026-07-05T12:00:00.000Z",
+        netWorth: "980.00",
+        totalAssets: "1400.00",
+        totalLiabilities: "420.00",
+        monthlyDebtPaymentTotal: "120.00",
+      },
+      {
+        date: "2026-07-08",
+        snapshotAt: "2026-07-08T15:00:00.000Z",
+        netWorth: "1170.00",
+        totalAssets: "1600.00",
+        totalLiabilities: "430.00",
+        monthlyDebtPaymentTotal: "130.00",
+      },
+    ],
+  });
+  assert.deepEqual(summary.trendSeries.slice(3), summary.trend?.visiblePoints);
+});
+
+test("buildDashboardSummary falls back to the latest trend date for invalid selections", () => {
+  const summary = buildDashboardSummary(
+    [
+      createSnapshot({
+        id: "snapshot-2",
+        snapshotAt: new Date("2026-03-02T00:00:00.000Z"),
+        createdAt: new Date("2026-03-02T00:00:00.000Z"),
+      }),
+      createSnapshot({
+        id: "snapshot-1",
+        snapshotAt: new Date("2026-02-28T00:00:00.000Z"),
+        createdAt: new Date("2026-02-28T00:00:00.000Z"),
+      }),
+    ],
+    { selectedDate: "2026-02-31" },
+  );
+
+  assert.equal(summary.trend?.selectedDate, "2026-03-02");
+  assert.deepEqual(summary.trend?.visiblePoints, [
+    {
+      date: "2026-03-02",
+      snapshotAt: "2026-03-02T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+  ]);
+});
+
+test("buildDashboardSummary uses a deterministic snapshot when same-day timestamps tie", () => {
+  const summary = buildDashboardSummary([
+    createSnapshot({
+      id: "snapshot-a",
+      totalAssets: decimal("1400.00"),
+      netWorth: decimal("1000.00"),
+      snapshotAt: new Date("2026-07-08T00:00:00.000Z"),
+      createdAt: new Date("2026-07-08T00:00:00.000Z"),
+    }),
+    createSnapshot({
+      id: "snapshot-b",
+      totalAssets: decimal("1500.00"),
+      netWorth: decimal("1100.00"),
+      snapshotAt: new Date("2026-07-08T00:00:00.000Z"),
+      createdAt: new Date("2026-07-08T00:00:00.000Z"),
+    }),
+    createSnapshot({
+      id: "snapshot-previous",
+      snapshotAt: new Date("2026-07-07T00:00:00.000Z"),
+      createdAt: new Date("2026-07-07T00:00:00.000Z"),
+    }),
+  ]);
+
+  assert.deepEqual(summary.trendSeries[1], {
+    date: "2026-07-08",
+    snapshotAt: "2026-07-08T00:00:00.000Z",
+    netWorth: "1100.00",
+    totalAssets: "1500.00",
+    totalLiabilities: "400.00",
+    monthlyDebtPaymentTotal: "120.00",
+  });
+});
+
+test("buildDashboardSummary keeps older daily history after many same-day snapshots", () => {
+  const latestSameDaySnapshots = Array.from({ length: 13 }, (_, index) =>
+    createSnapshot({
+      id: `snapshot-latest-${index.toString().padStart(2, "0")}`,
+      totalAssets: decimal(`${1300 + index}.00`),
+      netWorth: decimal(`${900 + index}.00`),
+      snapshotAt: new Date(`2026-07-08T${index.toString().padStart(2, "0")}:00:00.000Z`),
+      createdAt: new Date(`2026-07-08T${index.toString().padStart(2, "0")}:00:00.000Z`),
+    }),
+  ).reverse();
+
+  const summary = buildDashboardSummary([
+    ...latestSameDaySnapshots,
+    createSnapshot({
+      id: "snapshot-previous-day",
+      totalAssets: decimal("1200.00"),
+      netWorth: decimal("800.00"),
+      snapshotAt: new Date("2026-07-07T00:00:00.000Z"),
+      createdAt: new Date("2026-07-07T00:00:00.000Z"),
+    }),
+  ]);
+
+  assert.equal(summary.trend?.firstSelectableDate, "2026-07-07");
+  assert.equal(summary.trend?.latestSelectableDate, "2026-07-08");
+  assert.deepEqual(summary.trendSeries, [
+    {
+      date: "2026-07-07",
+      snapshotAt: "2026-07-07T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+    {
+      date: "2026-07-08",
+      snapshotAt: "2026-07-08T12:00:00.000Z",
+      netWorth: "912.00",
+      totalAssets: "1312.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+  ]);
 });
 
 test("buildDashboardSummary sorts issue messages by severity before dashboard consumers truncate them", () => {

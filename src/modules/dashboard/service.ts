@@ -1,6 +1,6 @@
 import { Prisma, type SnapshotAccount, type SnapshotHolding, type SnapshotIssue, type SnapshotLiability, type Snapshot } from "@prisma/client";
 
-import { createSnapshotRepository } from "@/modules/snapshots";
+import { createSnapshotRepository, type SnapshotTrendRecord } from "@/modules/snapshots";
 
 type DashboardSnapshot = Snapshot & {
   accounts: SnapshotAccount[];
@@ -8,6 +8,19 @@ type DashboardSnapshot = Snapshot & {
   liabilities: SnapshotLiability[];
   issues: SnapshotIssue[];
 };
+
+type DashboardTrendSnapshot =
+  | Pick<
+      DashboardSnapshot,
+      | "id"
+      | "snapshotAt"
+      | "createdAt"
+      | "netWorth"
+      | "totalAssets"
+      | "totalLiabilities"
+      | "monthlyDebtPaymentTotal"
+    >
+  | SnapshotTrendRecord;
 
 export type DashboardAllocationItem = {
   label: string;
@@ -57,18 +70,25 @@ export type DashboardReminders = {
 };
 
 export type DashboardTrendPoint = {
+  date: string;
   snapshotAt: string;
   netWorth: string;
   totalAssets: string;
   totalLiabilities: string;
+  monthlyDebtPaymentTotal: string;
 };
 
 export type DashboardTrend = {
-  previousSnapshotAt: string;
+  firstSelectableDate: string;
+  latestSelectableDate: string;
+  defaultSelectedDate: string;
+  selectedDate: string;
+  previousDate: string | null;
   netWorthChange: string;
   totalAssetsChange: string;
   totalLiabilitiesChange: string;
   monthlyDebtPaymentChange: string;
+  visiblePoints: DashboardTrendPoint[];
 };
 
 export type DashboardLatestSnapshot = {
@@ -102,7 +122,13 @@ export type DashboardSummary = {
   issueMessages: string[];
 };
 
+export type DashboardSummaryOptions = {
+  selectedDate?: string | null;
+};
+
 const snapshotRepository = createSnapshotRepository();
+const DASHBOARD_TREND_HISTORY_DAYS = 370;
+const DASHBOARD_TREND_SERIES_DAYS = 10;
 
 function toDecimal(value: Prisma.Decimal.Value) {
   return new Prisma.Decimal(value);
@@ -248,46 +274,159 @@ function buildReminders(issueMessages: string[]): DashboardReminders {
   };
 }
 
-function buildTrendSeries(snapshots: DashboardSnapshot[]) {
-  if (snapshots.length < 2) {
+function toDateKey(value: Date) {
+  return toIsoString(value).slice(0, 10);
+}
+
+function addUtcDays(dateKey: string, days: number) {
+  const date = new Date(`${dateKey}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function compareSnapshotsByTime(
+  left: DashboardTrendSnapshot,
+  right: DashboardTrendSnapshot,
+) {
+  const snapshotTimeDiff = left.snapshotAt.getTime() - right.snapshotAt.getTime();
+
+  if (snapshotTimeDiff !== 0) {
+    return snapshotTimeDiff;
+  }
+
+  const createdTimeDiff = left.createdAt.getTime() - right.createdAt.getTime();
+
+  if (createdTimeDiff !== 0) {
+    return createdTimeDiff;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function buildTrendPoint(date: string, snapshot: DashboardTrendSnapshot): DashboardTrendPoint {
+  return {
+    date,
+    snapshotAt: toIsoString(snapshot.snapshotAt),
+    netWorth: toDecimalString(toDecimal(snapshot.netWorth)),
+    totalAssets: toDecimalString(toDecimal(snapshot.totalAssets)),
+    totalLiabilities: toDecimalString(toDecimal(snapshot.totalLiabilities)),
+    monthlyDebtPaymentTotal: toDecimalString(toDecimal(snapshot.monthlyDebtPaymentTotal)),
+  };
+}
+
+function buildDailyTrendPoints(snapshots: DashboardTrendSnapshot[]) {
+  const snapshotsByDate = new Map<string, DashboardTrendSnapshot>();
+
+  for (const snapshot of snapshots) {
+    const dateKey = toDateKey(snapshot.snapshotAt);
+    const current = snapshotsByDate.get(dateKey);
+
+    if (!current || compareSnapshotsByTime(current, snapshot) < 0) {
+      snapshotsByDate.set(dateKey, snapshot);
+    }
+  }
+
+  const snapshotDates = [...snapshotsByDate.keys()].sort();
+
+  if (snapshotDates.length < 2) {
     return [];
   }
 
-  return [...snapshots]
-    .reverse()
-    .map((snapshot) => ({
-      snapshotAt: toIsoString(snapshot.snapshotAt),
-      netWorth: toDecimalString(toDecimal(snapshot.netWorth)),
-      totalAssets: toDecimalString(toDecimal(snapshot.totalAssets)),
-      totalLiabilities: toDecimalString(toDecimal(snapshot.totalLiabilities)),
-    }));
+  const firstDate = snapshotDates[0];
+  const latestDate = snapshotDates[snapshotDates.length - 1];
+  const points: DashboardTrendPoint[] = [];
+  let currentSnapshot: DashboardTrendSnapshot | undefined;
+
+  for (let date = firstDate; date <= latestDate; date = addUtcDays(date, 1)) {
+    currentSnapshot = snapshotsByDate.get(date) ?? currentSnapshot;
+
+    if (currentSnapshot) {
+      points.push(buildTrendPoint(date, currentSnapshot));
+    }
+  }
+
+  return points;
+}
+
+function normalizeSelectedDate(
+  selectedDate: string | null | undefined,
+  firstSelectableDate: string,
+  latestSelectableDate: string,
+) {
+  if (!selectedDate || !isValidDateKey(selectedDate)) {
+    return latestSelectableDate;
+  }
+
+  if (selectedDate < firstSelectableDate) {
+    return firstSelectableDate;
+  }
+
+  if (selectedDate > latestSelectableDate) {
+    return latestSelectableDate;
+  }
+
+  return selectedDate;
+}
+
+function isValidDateKey(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  return new Date(`${value}T00:00:00.000Z`).toISOString().slice(0, 10) === value;
 }
 
 function buildTrend(
-  latestSnapshot: DashboardSnapshot,
-  previousSnapshot: DashboardSnapshot | undefined,
+  dailyPoints: DashboardTrendPoint[],
+  options: DashboardSummaryOptions,
 ) {
-  if (!previousSnapshot) {
+  if (dailyPoints.length < 2) {
     return null;
   }
 
+  const firstSelectableDate = dailyPoints[0].date;
+  const latestSelectableDate = dailyPoints[dailyPoints.length - 1].date;
+  const selectedDate = normalizeSelectedDate(
+    options.selectedDate,
+    firstSelectableDate,
+    latestSelectableDate,
+  );
+  const selectedIndex = dailyPoints.findIndex((point) => point.date === selectedDate);
+  const previousPoint = selectedIndex > 0 ? dailyPoints[selectedIndex - 1] : null;
+  const selectedPoint = dailyPoints[selectedIndex];
+  const lastVisibleDate = addUtcDays(selectedDate, 9);
+  const visiblePoints = dailyPoints.filter(
+    (point) => point.date >= selectedDate && point.date <= lastVisibleDate,
+  );
+
   return {
-    previousSnapshotAt: toIsoString(previousSnapshot.snapshotAt),
+    firstSelectableDate,
+    latestSelectableDate,
+    defaultSelectedDate: latestSelectableDate,
+    selectedDate,
+    previousDate: previousPoint?.date ?? null,
     netWorthChange: toDecimalString(
-      toDecimal(latestSnapshot.netWorth).sub(previousSnapshot.netWorth),
+      toDecimal(selectedPoint.netWorth).sub(previousPoint?.netWorth ?? selectedPoint.netWorth),
     ),
     totalAssetsChange: toDecimalString(
-      toDecimal(latestSnapshot.totalAssets).sub(previousSnapshot.totalAssets),
+      toDecimal(selectedPoint.totalAssets).sub(previousPoint?.totalAssets ?? selectedPoint.totalAssets),
     ),
     totalLiabilitiesChange: toDecimalString(
-      toDecimal(latestSnapshot.totalLiabilities).sub(previousSnapshot.totalLiabilities),
-    ),
-    monthlyDebtPaymentChange: toDecimalString(
-      toDecimal(latestSnapshot.monthlyDebtPaymentTotal).sub(
-        previousSnapshot.monthlyDebtPaymentTotal,
+      toDecimal(selectedPoint.totalLiabilities).sub(
+        previousPoint?.totalLiabilities ?? selectedPoint.totalLiabilities,
       ),
     ),
+    monthlyDebtPaymentChange: toDecimalString(
+      toDecimal(selectedPoint.monthlyDebtPaymentTotal).sub(
+        previousPoint?.monthlyDebtPaymentTotal ?? selectedPoint.monthlyDebtPaymentTotal,
+      ),
+    ),
+    visiblePoints,
   };
+}
+
+function buildDefaultTrendSeries(dailyPoints: DashboardTrendPoint[]) {
+  return dailyPoints.slice(-DASHBOARD_TREND_SERIES_DAYS);
 }
 
 const issueSeverityRank: Record<SnapshotIssue["severity"], number> = {
@@ -310,9 +449,11 @@ function buildIssueMessages(snapshot: DashboardSnapshot) {
     .map((issue) => issue.message);
 }
 
-export function buildDashboardSummary(snapshots: DashboardSnapshot[]): DashboardSummary {
-  const [latestSnapshot, previousSnapshot] = snapshots;
-
+function buildDashboardSummaryFromParts(
+  latestSnapshot: DashboardSnapshot | undefined,
+  trendSnapshots: DashboardTrendSnapshot[],
+  options: DashboardSummaryOptions = {},
+): DashboardSummary {
   if (!latestSnapshot) {
     return {
       sidebarSummary: buildSidebarSummary(null, []),
@@ -351,26 +492,54 @@ export function buildDashboardSummary(snapshots: DashboardSnapshot[]): Dashboard
   } satisfies DashboardLatestSnapshot;
 
   const issueMessages = buildIssueMessages(latestSnapshot);
+  const dailyTrendPoints = buildDailyTrendPoints(trendSnapshots);
+  const trend = buildTrend(dailyTrendPoints, options);
+  const trendSeries = buildDefaultTrendSeries(dailyTrendPoints);
 
   return {
     sidebarSummary: buildSidebarSummary(dashboardLatestSnapshot, issueMessages),
     emptyState: null,
     heroSummary: buildHeroSummary(
       dashboardLatestSnapshot,
-      previousSnapshot != null,
+      trend != null,
     ),
     latestSnapshot: dashboardLatestSnapshot,
     coverage: buildCoverage(dashboardLatestSnapshot),
     reminders: buildReminders(issueMessages),
     allocation: buildAllocation(latestSnapshot),
     liabilityBreakdown: buildLiabilityBreakdown(latestSnapshot),
-    trend: buildTrend(latestSnapshot, previousSnapshot),
-    trendSeries: buildTrendSeries(snapshots),
+    trend,
+    trendSeries,
     issueMessages,
   };
 }
 
-export async function createDashboardSummaryForUser(userId: string) {
-  const snapshots = await snapshotRepository.listByUser(userId, { take: 12 });
-  return buildDashboardSummary(snapshots);
+export function buildDashboardSummary(
+  snapshots: DashboardSnapshot[],
+  options: DashboardSummaryOptions = {},
+): DashboardSummary {
+  return buildDashboardSummaryFromParts(snapshots[0], snapshots, options);
+}
+
+export async function createDashboardSummaryForUser(
+  userId: string,
+  options: DashboardSummaryOptions = {},
+) {
+  const [latestSnapshot] = await snapshotRepository.listByUser(userId, { take: 1 });
+
+  if (!latestSnapshot) {
+    return buildDashboardSummaryFromParts(undefined, [], options);
+  }
+
+  const trendSince = new Date(
+    `${addUtcDays(
+      toDateKey(latestSnapshot.snapshotAt),
+      -(DASHBOARD_TREND_HISTORY_DAYS - 1),
+    )}T00:00:00.000Z`,
+  );
+  const trendSnapshots = await snapshotRepository.listTrendByUser(userId, {
+    since: trendSince,
+  });
+
+  return buildDashboardSummaryFromParts(latestSnapshot, trendSnapshots, options);
 }

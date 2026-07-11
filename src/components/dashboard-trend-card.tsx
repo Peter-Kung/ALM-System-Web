@@ -30,7 +30,7 @@ type DashboardTrendCardProps = {
 };
 
 type TrendDatum = {
-  snapshotAt: string;
+  date: string;
   shortDate: string;
   netWorth: number;
   totalAssets: number;
@@ -47,8 +47,8 @@ export function DashboardTrendCard({
   }
 
   const chartData = trendSeries.map((point) => ({
-    snapshotAt: point.snapshotAt,
-    shortDate: formatShortDate(point.snapshotAt),
+    date: point.date,
+    shortDate: formatShortDate(point.date),
     netWorth: Number(point.netWorth),
     totalAssets: Number(point.totalAssets),
     totalLiabilities: Number(point.totalLiabilities),
@@ -147,7 +147,7 @@ export function DashboardTrendCard({
         </thead>
         <tbody>
           {chartData.map((point) => (
-            <tr key={point.snapshotAt}>
+            <tr key={point.date}>
               <th scope="row">{point.shortDate}</th>
               <td>{formatDashboardAmount(point.netWorth, baseCurrency, amountDisplayMode)}</td>
               <td>{formatDashboardAmount(point.totalAssets, baseCurrency, amountDisplayMode)}</td>

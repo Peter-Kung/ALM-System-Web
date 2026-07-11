@@ -132,24 +132,50 @@ function createDashboardSummary(
       { label: "Mortgage", value: "400.00", shareOfAssets: "100.00" },
     ],
     trend: {
-      previousSnapshotAt: "2026-07-01T00:00:00.000Z",
+      firstSelectableDate: "2026-07-01",
+      latestSelectableDate: "2026-07-08",
+      defaultSelectedDate: "2026-07-08",
+      selectedDate: "2026-07-01",
+      previousDate: null,
       netWorthChange: "80.00",
       totalAssetsChange: "100.00",
       totalLiabilitiesChange: "20.00",
       monthlyDebtPaymentChange: "5.00",
+      visiblePoints: [
+        {
+          date: "2026-07-01",
+          snapshotAt: "2026-07-01T00:00:00.000Z",
+          netWorth: "720.00",
+          totalAssets: "1100.00",
+          totalLiabilities: "380.00",
+          monthlyDebtPaymentTotal: "115.00",
+        },
+        {
+          date: "2026-07-08",
+          snapshotAt: "2026-07-08T00:00:00.000Z",
+          netWorth: "800.00",
+          totalAssets: "1200.00",
+          totalLiabilities: "400.00",
+          monthlyDebtPaymentTotal: "120.00",
+        },
+      ],
     },
     trendSeries: [
       {
+        date: "2026-07-01",
         snapshotAt: "2026-07-01T00:00:00.000Z",
         netWorth: "720.00",
         totalAssets: "1100.00",
         totalLiabilities: "380.00",
+        monthlyDebtPaymentTotal: "115.00",
       },
       {
+        date: "2026-07-08",
         snapshotAt: "2026-07-08T00:00:00.000Z",
         netWorth: "800.00",
         totalAssets: "1200.00",
         totalLiabilities: "400.00",
+        monthlyDebtPaymentTotal: "120.00",
       },
     ],
     issueMessages: [
@@ -270,16 +296,20 @@ test("dashboard page view defaults dashboard amounts to compact K display", () =
         ],
         trendSeries: [
           {
+            date: "2026-07-01",
             snapshotAt: "2026-07-01T00:00:00.000Z",
             netWorth: "900.00",
             totalAssets: "1000.00",
             totalLiabilities: "100.00",
+            monthlyDebtPaymentTotal: "100.00",
           },
           {
+            date: "2026-07-08",
             snapshotAt: "2026-07-08T00:00:00.000Z",
             netWorth: "999.99",
             totalAssets: "1200.00",
             totalLiabilities: "1000.00",
+            monthlyDebtPaymentTotal: "120.00",
           },
         ],
       })}
@@ -296,6 +326,36 @@ test("dashboard page view defaults dashboard amounts to compact K display", () =
   assert.match(markup, /TWD 999\.99/);
   assert.doesNotMatch(markup, /1200\.00 TWD/);
   assert.doesNotMatch(markup, /TWD 1200\.00/);
+});
+
+test("dashboard page view labels carried-forward trend points by calendar date", () => {
+  const markup = renderToStaticMarkup(
+    <DashboardPageView
+      dashboard={createDashboardSummary({
+        trendSeries: [
+          {
+            date: "2026-07-01",
+            snapshotAt: "2026-07-01T00:00:00.000Z",
+            netWorth: "720.00",
+            totalAssets: "1100.00",
+            totalLiabilities: "380.00",
+            monthlyDebtPaymentTotal: "115.00",
+          },
+          {
+            date: "2026-07-02",
+            snapshotAt: "2026-07-01T00:00:00.000Z",
+            netWorth: "720.00",
+            totalAssets: "1100.00",
+            totalLiabilities: "380.00",
+            monthlyDebtPaymentTotal: "115.00",
+          },
+        ],
+      })}
+    />,
+  );
+
+  assert.match(markup, /Jul 1/);
+  assert.match(markup, /Jul 2/);
 });
 
 test("dashboard page view persists the full amount display preference", async () => {
@@ -400,10 +460,12 @@ test("dashboard page view hides the trend card when fewer than two snapshots exi
         trend: null,
         trendSeries: [
           {
+            date: "2026-07-08",
             snapshotAt: "2026-07-08T00:00:00.000Z",
             netWorth: "800.00",
             totalAssets: "1200.00",
             totalLiabilities: "400.00",
+            monthlyDebtPaymentTotal: "120.00",
           },
         ],
       })}

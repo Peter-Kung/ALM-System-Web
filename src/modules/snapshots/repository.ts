@@ -16,6 +16,20 @@ const snapshotInclude = {
   issues: true,
 } satisfies Prisma.SnapshotInclude;
 
+const snapshotTrendSelect = {
+  id: true,
+  snapshotAt: true,
+  createdAt: true,
+  totalAssets: true,
+  totalLiabilities: true,
+  netWorth: true,
+  monthlyDebtPaymentTotal: true,
+} satisfies Prisma.SnapshotSelect;
+
+export type SnapshotTrendRecord = Prisma.SnapshotGetPayload<{
+  select: typeof snapshotTrendSelect;
+}>;
+
 function toArray<T>(value: T | T[] | undefined) {
   if (!value) {
     return [];
@@ -192,8 +206,18 @@ export function createSnapshotRepository(db: PrismaExecutor = prisma) {
       return db.snapshot.findMany({
         where: { userId },
         include: snapshotInclude,
-        orderBy: [{ snapshotAt: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ snapshotAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
         take: options?.take,
+      });
+    },
+    listTrendByUser(userId: string, options?: { since?: Date }) {
+      return db.snapshot.findMany({
+        where: {
+          userId,
+          ...(options?.since ? { snapshotAt: { gte: options.since } } : {}),
+        },
+        select: snapshotTrendSelect,
+        orderBy: [{ snapshotAt: "desc" }, { createdAt: "desc" }, { id: "desc" }],
       });
     },
   };
