@@ -32,6 +32,8 @@ function createAuthUser(overrides: Partial<AuthUser>): AuthUser {
     role: "ADMIN",
     isActive: true,
     sessionVersion: 0,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     lastLoginAt: null,
     createdAt: new Date("2026-07-01T00:00:00Z"),
     ...overrides,
@@ -48,6 +50,15 @@ function parseOptionalDate(value: Date | string | null | undefined) {
   }
 
   return null;
+}
+
+function cloneAuthUser(user: AuthUser): AuthUser {
+  return {
+    ...user,
+    createdAt: new Date(user.createdAt),
+    lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt) : null,
+    lockedUntil: user.lockedUntil ? new Date(user.lockedUntil) : null,
+  };
 }
 
 function createRepositoryFixture(
@@ -75,16 +86,32 @@ function createRepositoryFixture(
 
   return {
     async findById(id: string) {
-      return users.find((user) => user.id === id) ?? null;
+      const user = users.find((entry) => entry.id === id);
+      return user ? cloneAuthUser(user) : null;
     },
     async findByUsername(username: string) {
-      return users.find((user) => user.username === username) ?? null;
+      const user = users.find((entry) => entry.username === username);
+      return user ? cloneAuthUser(user) : null;
     },
     async findFirstUser() {
-      return users[0] ?? null;
+      return users[0] ? cloneAuthUser(users[0]) : null;
     },
     async findFirstUserWithPasswordHash() {
-      return users.find((user) => user.passwordHash) ?? null;
+      const user = users.find((entry) => entry.passwordHash);
+      return user ? cloneAuthUser(user) : null;
+    },
+    async compareAndSetLoginState(id, expected, data) {
+      const user = users.find((entry) => entry.id === id);
+      if (
+        !user ||
+        user.failedLoginAttempts !== expected.failedLoginAttempts ||
+        user.lastLoginAt?.getTime() !== expected.lastLoginAt?.getTime() ||
+        user.lockedUntil?.getTime() !== expected.lockedUntil?.getTime()
+      ) {
+        return null;
+      }
+
+      return this.update(id, data);
     },
     async create(data: Prisma.UserCreateInput) {
       const user = createAuthUser({
@@ -98,11 +125,13 @@ function createRepositoryFixture(
         role: data.role ?? ("ADMIN" as const),
         isActive: data.isActive ?? true,
         sessionVersion: data.sessionVersion ?? 0,
+        failedLoginAttempts: data.failedLoginAttempts ?? 0,
+        lockedUntil: parseOptionalDate(data.lockedUntil),
         lastLoginAt: data.lastLoginAt instanceof Date ? data.lastLoginAt : null,
         createdAt: new Date(`2026-07-0${users.length + 1}T00:00:00Z`),
       });
       users.push(user);
-      return user;
+      return cloneAuthUser(user);
     },
     async createFirstAdministrator(data: { passwordHash: string; username: string }) {
       const user = createAuthUser({
@@ -113,7 +142,7 @@ function createRepositoryFixture(
         createdAt: new Date(`2026-07-0${users.length + 1}T00:00:00Z`),
       });
       users.push(user);
-      return user;
+      return cloneAuthUser(user);
     },
     async update(id: string, data: Prisma.UserUncheckedUpdateInput) {
       const user = users.find((entry) => entry.id === id);
@@ -145,6 +174,16 @@ function createRepositoryFixture(
         user.lastLoginAt = data.lastLoginAt;
       }
 
+      if (typeof data.failedLoginAttempts === "number") {
+        user.failedLoginAttempts = data.failedLoginAttempts;
+      }
+
+      if (data.lockedUntil === null) {
+        user.lockedUntil = null;
+      } else if (typeof data.lockedUntil === "object" && data.lockedUntil instanceof Date) {
+        user.lockedUntil = data.lockedUntil;
+      }
+
       if (typeof data.sessionVersion === "number") {
         user.sessionVersion = data.sessionVersion;
       } else if (
@@ -156,7 +195,7 @@ function createRepositoryFixture(
         user.sessionVersion += data.sessionVersion.increment;
       }
 
-      return user;
+      return cloneAuthUser(user);
     },
     async createUserActionToken(data: Prisma.UserActionTokenUncheckedCreateInput) {
       tokenCounter += 1;
@@ -271,7 +310,9 @@ test("createFirstAdministrator creates the only first-run admin account", async 
   assert.equal(user.isActive, true);
   assert.equal(user.sessionVersion, 0);
   assert.equal(await verifyPassword("new-password", user.passwordHash), true);
-  assert.equal(await validateOwnerLogin("owner", "new-password", repository), user);
+  const loggedInUser = await validateOwnerLogin("owner", "new-password", repository);
+  assert.ok(loggedInUser);
+  assert.equal(loggedInUser.id, user.id);
 });
 
 test("ensureConfiguredAdministrator creates the fixed owner when no users exist", async () => {
@@ -370,6 +411,189 @@ test("validateOwnerLogin accepts the stored password hash once database-backed a
   assert.ok(user);
   assert.equal(user.id, "user-1");
   assert.ok(user.lastLoginAt);
+});
+
+test("validateOwnerLogin locks a username after five consecutive failures", async () => {
+  const now = new Date("2026-07-12T00:00:00Z");
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("correct-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    assert.equal(
+      await validateOwnerLogin("owner", "wrong-password", repository, now),
+      null,
+    );
+  }
+
+  const user = await repository.findById("user-1");
+  assert.equal(user?.failedLoginAttempts, 5);
+  assert.equal(user?.lockedUntil?.toISOString(), "2026-07-12T00:10:00.000Z");
+});
+
+test("validateOwnerLogin locks a username under concurrent invalid attempts", async () => {
+  const now = new Date("2026-07-12T00:00:00Z");
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("correct-password"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  await Promise.all(
+    Array.from({ length: 5 }, () =>
+      validateOwnerLogin("owner", "wrong-password", repository, now),
+    ),
+  );
+
+  const user = await repository.findById("user-1");
+  assert.equal(user?.failedLoginAttempts, 5);
+  assert.equal(user?.lockedUntil?.toISOString(), "2026-07-12T00:10:00.000Z");
+});
+
+test("validateOwnerLogin rejects correct credentials during an active lockout", async () => {
+  const now = new Date("2026-07-12T00:00:00Z");
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("correct-password"),
+      failedLoginAttempts: 5,
+      lockedUntil: new Date("2026-07-12T00:10:00Z"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  assert.equal(
+    await validateOwnerLogin("owner", "correct-password", repository, now),
+    null,
+  );
+});
+
+test("validateOwnerLogin clears the lockout after expiry when credentials are correct", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("correct-password"),
+      failedLoginAttempts: 5,
+      lockedUntil: new Date("2026-07-12T00:10:00Z"),
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const user = await validateOwnerLogin(
+    "owner",
+    "correct-password",
+    repository,
+    new Date("2026-07-12T00:10:01Z"),
+  );
+
+  assert.ok(user);
+  assert.equal(user.failedLoginAttempts, 0);
+  assert.equal(user.lockedUntil, null);
+  assert.equal(user.lastLoginAt?.toISOString(), "2026-07-12T00:10:01.000Z");
+});
+
+test("validateOwnerLogin clears previous failed attempts after a successful login", async () => {
+  const now = new Date("2026-07-12T00:00:00Z");
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("correct-password"),
+      failedLoginAttempts: 3,
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+
+  const user = await validateOwnerLogin("owner", "correct-password", repository, now);
+
+  assert.ok(user);
+  assert.equal(user.failedLoginAttempts, 0);
+  assert.equal(user.lockedUntil, null);
+  assert.equal(user.lastLoginAt?.toISOString(), now.toISOString());
+});
+
+test("validateOwnerLogin does not bypass a lockout claimed during successful-login retry", async () => {
+  const now = new Date("2026-07-12T00:00:00Z");
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("correct-password"),
+      failedLoginAttempts: 4,
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+  let compareAttempts = 0;
+  const baseCompareAndSet = repository.compareAndSetLoginState.bind(repository);
+
+  repository.compareAndSetLoginState = async (id, expected, data) => {
+    compareAttempts += 1;
+    if (compareAttempts === 1) {
+      await repository.update(id, {
+        failedLoginAttempts: 5,
+        lockedUntil: new Date("2026-07-12T00:10:00Z"),
+      });
+      return null;
+    }
+
+    return baseCompareAndSet(id, expected, data);
+  };
+
+  assert.equal(
+    await validateOwnerLogin("owner", "correct-password", repository, now),
+    null,
+  );
+
+  const user = await repository.findById("user-1");
+  assert.equal(user?.failedLoginAttempts, 5);
+  assert.equal(user?.lockedUntil?.toISOString(), "2026-07-12T00:10:00.000Z");
+});
+
+test("validateOwnerLogin preserves an active lockout during failed-login retry conflicts", async () => {
+  const now = new Date("2026-07-12T00:00:00Z");
+  const repository = createRepositoryFixture([
+    {
+      id: "user-1",
+      username: "owner",
+      passwordHash: await hashPassword("correct-password"),
+      failedLoginAttempts: 4,
+      createdAt: new Date("2026-07-01T00:00:00Z"),
+    },
+  ]);
+  let compareAttempts = 0;
+  const baseCompareAndSet = repository.compareAndSetLoginState.bind(repository);
+
+  repository.compareAndSetLoginState = async (id, expected, data) => {
+    compareAttempts += 1;
+    if (compareAttempts === 1) {
+      await repository.update(id, {
+        failedLoginAttempts: 5,
+        lockedUntil: new Date("2026-07-12T00:10:00Z"),
+      });
+      return null;
+    }
+
+    return baseCompareAndSet(id, expected, data);
+  };
+
+  assert.equal(
+    await validateOwnerLogin("owner", "wrong-password", repository, now),
+    null,
+  );
+
+  const user = await repository.findById("user-1");
+  assert.equal(user?.failedLoginAttempts, 5);
+  assert.equal(user?.lockedUntil?.toISOString(), "2026-07-12T00:10:00.000Z");
 });
 
 test("validateOwnerLogin rejects inactive users", async () => {

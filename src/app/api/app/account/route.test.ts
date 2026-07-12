@@ -18,6 +18,8 @@ function createAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
     role: "ADMIN",
     isActive: true,
     sessionVersion: 0,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
     lastLoginAt: null,
     createdAt: new Date("2026-07-01T00:00:00Z"),
     ...overrides,
@@ -27,6 +29,9 @@ function createAuthUser(overrides: Partial<AuthUser> = {}): AuthUser {
 test("patchAccountForUser keeps the session when only the display name changes", async () => {
   let cleared = false;
   const repository: AuthRepository = {
+    async compareAndSetLoginState(id, _expected, data) {
+      return this.update(id, data);
+    },
     async findById() {
       return createAuthUser();
     },
@@ -78,6 +83,9 @@ test("patchAccountHandler clears the session after a successful password update"
   let savedPasswordHash: string | null = null;
   const currentPasswordHash = await hashPassword("current-password");
   const repository: AuthRepository = {
+    async compareAndSetLoginState(id, _expected, data) {
+      return this.update(id, data);
+    },
     async findById() {
       return createAuthUser({
         passwordHash: currentPasswordHash,
@@ -227,6 +235,9 @@ test("patchAccountForUser does not clear the session when password validation fa
   let cleared = false;
   const currentPasswordHash = await hashPassword("current-password");
   const repository: AuthRepository = {
+    async compareAndSetLoginState(id, _expected, data) {
+      return this.update(id, data);
+    },
     async findById() {
       return createAuthUser({
         passwordHash: currentPasswordHash,

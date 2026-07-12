@@ -18,6 +18,8 @@ export type AuthUser = Pick<
   | "role"
   | "isActive"
   | "sessionVersion"
+  | "failedLoginAttempts"
+  | "lockedUntil"
   | "lastLoginAt"
   | "createdAt"
 >;
@@ -43,6 +45,8 @@ const authUserSelect = {
   role: true,
   isActive: true,
   sessionVersion: true,
+  failedLoginAttempts: true,
+  lockedUntil: true,
   lastLoginAt: true,
   createdAt: true,
 } satisfies Prisma.UserSelect;
@@ -60,6 +64,15 @@ const authUserActionTokenSelect = {
 } satisfies Prisma.UserActionTokenSelect;
 
 export type AuthRepository = {
+  compareAndSetLoginState(
+    id: string,
+    expected: {
+      failedLoginAttempts: number;
+      lastLoginAt: Date | null;
+      lockedUntil: Date | null;
+    },
+    data: Prisma.UserUncheckedUpdateInput,
+  ): Promise<AuthUser | null>;
   create(data: Prisma.UserCreateInput): Promise<AuthUser>;
   createFirstAdministrator(data: {
     passwordHash: string;
@@ -76,6 +89,34 @@ export function createAuthRepository(
   db: PrismaExecutor = prisma,
 ): AuthRepository & UserActionTokenRepository {
   return {
+    async compareAndSetLoginState(
+      id: string,
+      expected: {
+        failedLoginAttempts: number;
+        lastLoginAt: Date | null;
+        lockedUntil: Date | null;
+      },
+      data: Prisma.UserUncheckedUpdateInput,
+    ): Promise<AuthUser | null> {
+      const result = await db.user.updateMany({
+        where: {
+          id,
+          failedLoginAttempts: expected.failedLoginAttempts,
+          lastLoginAt: expected.lastLoginAt,
+          lockedUntil: expected.lockedUntil,
+        },
+        data,
+      });
+
+      if (result.count === 0) {
+        return null;
+      }
+
+      return db.user.findUnique({
+        where: { id },
+        select: authUserSelect,
+      });
+    },
     findById(id: string): Promise<AuthUser | null> {
       return db.user.findUnique({
         where: { id },

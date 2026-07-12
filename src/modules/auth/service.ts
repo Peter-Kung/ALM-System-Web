@@ -17,6 +17,9 @@ import {
 } from "@/modules/auth/action-token";
 
 const PASSWORD_SALT_ROUNDS = 12;
+const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
+const LOGIN_LOCKOUT_THRESHOLD = 5;
+const LOGIN_LOCKOUT_DURATION_MS = 10 * 60 * 1000;
 export type UpdateAccountCredentialsInput = {
   confirmNewPassword?: string;
   currentPassword?: string;
@@ -75,6 +78,7 @@ async function backfillLegacyOwner(
   repository: AuthRepository,
   user: AuthUser,
   password: string,
+  now: Date,
 ) {
   const passwordHash = await hashPassword(password);
   return repository.update(user.id, {
@@ -82,7 +86,87 @@ async function backfillLegacyOwner(
     passwordHash,
     role: "ADMIN",
     isActive: true,
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+    lastLoginAt: now,
   });
+}
+
+async function recordFailedLoginAttempt(
+  repository: AuthRepository,
+  user: AuthUser,
+  now: Date,
+) {
+  let currentUser: AuthUser | null = user;
+
+  for (let attempt = 0; attempt < 5 && currentUser; attempt += 1) {
+    const baseFailedAttempts =
+      currentUser.lockedUntil && currentUser.lockedUntil.getTime() <= now.getTime()
+        ? 0
+        : currentUser.failedLoginAttempts;
+    const failedLoginAttempts = baseFailedAttempts + 1;
+    const lockedUntil =
+      failedLoginAttempts >= LOGIN_LOCKOUT_THRESHOLD
+        ? new Date(now.getTime() + LOGIN_LOCKOUT_DURATION_MS)
+        : null;
+
+    const updatedUser = await repository.compareAndSetLoginState(
+      currentUser.id,
+      {
+        failedLoginAttempts: currentUser.failedLoginAttempts,
+        lockedUntil: currentUser.lockedUntil,
+        lastLoginAt: currentUser.lastLoginAt,
+      },
+      {
+        failedLoginAttempts,
+        lockedUntil,
+      },
+    );
+    if (updatedUser) {
+      return updatedUser;
+    }
+
+    currentUser = await repository.findById(currentUser.id);
+    if (currentUser?.lockedUntil && currentUser.lockedUntil.getTime() > now.getTime()) {
+      return currentUser;
+    }
+  }
+
+  return currentUser;
+}
+
+async function recordSuccessfulLogin(
+  repository: AuthRepository,
+  user: AuthUser,
+  now: Date,
+) {
+  let currentUser: AuthUser | null = user;
+
+  for (let attempt = 0; attempt < 5 && currentUser; attempt += 1) {
+    const updatedUser = await repository.compareAndSetLoginState(
+      currentUser.id,
+      {
+        failedLoginAttempts: currentUser.failedLoginAttempts,
+        lockedUntil: currentUser.lockedUntil,
+        lastLoginAt: currentUser.lastLoginAt,
+      },
+      {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastLoginAt: now,
+      },
+    );
+    if (updatedUser) {
+      return updatedUser;
+    }
+
+    currentUser = await repository.findById(currentUser.id);
+    if (currentUser?.lockedUntil && currentUser.lockedUntil.getTime() > now.getTime()) {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 async function ensureFixedOwner(
@@ -151,10 +235,17 @@ export async function validateOwnerLogin(
   username: string,
   password: string,
   repository: AuthRepository = createAuthRepository(),
+  now: Date = new Date(),
 ) {
   await ensureFixedOwner(repository);
   const trimmedUsername = username.trim();
   const user = await repository.findByUsername(trimmedUsername);
+  const activeLockout =
+    user?.lockedUntil && user.lockedUntil.getTime() > now.getTime();
+
+  if (activeLockout) {
+    return null;
+  }
 
   if (user && !user.passwordHash) {
     const hashedUser = await repository.findFirstUserWithPasswordHash();
@@ -163,7 +254,7 @@ export async function validateOwnerLogin(
       trimmedUsername === env.fixedUsername &&
       password === requireFixedPassword()
     ) {
-      return backfillLegacyOwner(repository, user, password);
+      return backfillLegacyOwner(repository, user, password, now);
     }
   }
 
@@ -173,10 +264,11 @@ export async function validateOwnerLogin(
 
   const isValid = await verifyPassword(password, user.passwordHash);
   if (!isValid) {
+    await recordFailedLoginAttempt(repository, user, now);
     return null;
   }
 
-  return repository.update(user.id, { lastLoginAt: new Date() });
+  return recordSuccessfulLogin(repository, user, now);
 }
 
 function normalizeUsername(username: string) {
@@ -184,7 +276,7 @@ function normalizeUsername(username: string) {
 }
 
 function validateNextUsername(username: string) {
-  if (username.length < 3 || username.length > 32 || !/^[A-Za-z0-9._-]+$/.test(username)) {
+  if (username.length < 3 || username.length > 32 || !USERNAME_PATTERN.test(username)) {
     throw new RepositoryValidationError(
       "Username must be 3 to 32 characters and use only letters, numbers, '.', '_', and '-'.",
     );
@@ -415,7 +507,7 @@ async function verifyCurrentPassword(
   ) {
     const hashedUser = await repository.findFirstUserWithPasswordHash();
     if (!hashedUser) {
-      return backfillLegacyOwner(repository, user, currentPassword);
+      return backfillLegacyOwner(repository, user, currentPassword, new Date());
     }
   }
 

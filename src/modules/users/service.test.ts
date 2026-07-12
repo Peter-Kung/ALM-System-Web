@@ -265,6 +265,41 @@ test("listManagedUsers returns admin-safe user fields", async () => {
   ]);
 });
 
+test("listManagedUsers exposes current login lockout state to admins", async () => {
+  const repository = createRepositoryFixture([
+    {
+      id: "family-user",
+      username: "family",
+      role: "USER",
+      failedLoginAttempts: 5,
+      lockedUntil: new Date("2026-07-12T00:10:00Z"),
+    },
+  ]);
+
+  assert.deepEqual(await listManagedUsers(repository), [
+    {
+      id: "family-user",
+      username: "family",
+      displayName: null,
+      role: "USER",
+      isActive: true,
+      sessionVersion: 0,
+      loginLockout: {
+        failedAttempts: 5,
+        lockedUntil: "2026-07-12T00:10:00.000Z",
+      },
+      lastLoginAt: null,
+      telegramBinding: {
+        state: "UNBOUND",
+        telegramUsername: null,
+        boundAt: null,
+      },
+      createdAt: "2026-07-01T00:00:00.000Z",
+      updatedAt: "2026-07-01T00:00:00.000Z",
+    },
+  ]);
+});
+
 test("createManagedUser creates a user without a password", async () => {
   const repository = createRepositoryFixture();
 

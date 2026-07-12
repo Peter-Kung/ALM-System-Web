@@ -4,6 +4,7 @@ import test from "node:test";
 import { NextRequest } from "next/server";
 
 import { setupHandler } from "@/app/api/auth/setup/handler";
+
 test("setupHandler reports that interactive setup is no longer available", async () => {
   const response = await setupHandler(
     new NextRequest("https://example.test/api/auth/setup", {
