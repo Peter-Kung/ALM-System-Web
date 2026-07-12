@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "predev": "npm run db:generate",
+    "pretest": "npm run db:generate",
+    "pretypecheck": "npm run db:generate",
     "dev": "next dev",
     "build": "npm run db:generate && npm run build:next",
     "build:next": "next build",
