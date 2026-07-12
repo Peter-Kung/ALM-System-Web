@@ -326,7 +326,9 @@ test("ensureConfiguredAdministrator creates the fixed owner when no users exist"
   assert.equal(user.isActive, true);
   assert.equal(user.sessionVersion, 0);
   assert.ok(user.passwordHash);
-  assert.equal(await validateOwnerLogin("owner", "change-me", repository), user);
+  const loggedInUser = await validateOwnerLogin("owner", "change-me", repository);
+  assert.ok(loggedInUser);
+  assert.equal(loggedInUser.id, user.id);
 });
 
 test("ensureConfiguredAdministrator upgrades an existing owner without changing its id", async () => {
@@ -348,7 +350,9 @@ test("ensureConfiguredAdministrator upgrades an existing owner without changing 
   assert.equal(user.role, "ADMIN");
   assert.equal(user.isActive, true);
   assert.ok(user.passwordHash);
-  assert.equal(await validateOwnerLogin("owner", "change-me", repository), user);
+  const loggedInUser = await validateOwnerLogin("owner", "change-me", repository);
+  assert.ok(loggedInUser);
+  assert.equal(loggedInUser.id, user.id);
 });
 
 test("ensureConfiguredAdministrator leaves an existing hashed owner unchanged", async () => {
