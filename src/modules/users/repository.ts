@@ -118,8 +118,10 @@ export function createUserManagementRepository(
           username: data.username,
           displayName: data.displayName,
           role: data.role,
+          status: data.isActive ? "ACTIVE" : "DISABLED",
           isActive: data.isActive,
           passwordHash: null,
+          sessionVersion: 1,
         },
         select: managedUserSelect,
       });

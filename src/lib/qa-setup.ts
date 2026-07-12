@@ -3,7 +3,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const QA_USERNAME = "qa-owner";
-const DEV_DATABASE_URL = "file:./dev.db";
+const DEV_DATABASE_URL =
+  "postgresql://postgres:postgres@127.0.0.1:5432/alm_system_web?schema=public";
 
 type QaSetupLogger = {
   info(message: string): void;

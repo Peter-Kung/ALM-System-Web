@@ -6,6 +6,9 @@ import test from "node:test";
 
 import { buildQaEnvFile, runQaSetup } from "@/lib/qa-setup";
 
+const DEV_DATABASE_URL =
+  "postgresql://postgres:postgres@127.0.0.1:5432/alm_system_web?schema=public";
+
 test("runQaSetup creates a new .env, prints credentials once, and runs Prisma setup", async () => {
   const cwd = await mkdtemp(path.join(os.tmpdir(), "qa-setup-new-"));
   const logs: string[] = [];
@@ -44,13 +47,13 @@ test("runQaSetup creates a new .env, prints credentials once, and runs Prisma se
       command: "npm",
       args: ["run", "db:generate"],
       cwd,
-      envOverrides: { DATABASE_URL: "file:./dev.db" },
+      envOverrides: { DATABASE_URL: DEV_DATABASE_URL },
     },
     {
       command: "npm",
       args: ["run", "db:migrate"],
       cwd,
-      envOverrides: { DATABASE_URL: "file:./dev.db" },
+      envOverrides: { DATABASE_URL: DEV_DATABASE_URL },
     },
   ]);
   assert.match(logs.join("\n"), /APP_USERNAME=qa-owner/);
@@ -69,7 +72,7 @@ test("runQaSetup preserves an existing .env and does not print the password", as
     envOverrides: Partial<NodeJS.ProcessEnv>;
   }> = [];
   const existingEnv = [
-    'DATABASE_URL="file:./existing.db"',
+    'DATABASE_URL="postgresql://db.internal:5432/existing_alm?schema=public"',
     "APP_USERNAME=existing-owner",
     "APP_PASSWORD=do-not-print-me",
     "SESSION_SECRET=existing-session-secret",
@@ -96,13 +99,13 @@ test("runQaSetup preserves an existing .env and does not print the password", as
       command: "npm",
       args: ["run", "db:generate"],
       cwd,
-      envOverrides: { DATABASE_URL: "file:./existing.db" },
+      envOverrides: { DATABASE_URL: "postgresql://db.internal:5432/existing_alm?schema=public" },
     },
     {
       command: "npm",
       args: ["run", "db:migrate"],
       cwd,
-      envOverrides: { DATABASE_URL: "file:./existing.db" },
+      envOverrides: { DATABASE_URL: "postgresql://db.internal:5432/existing_alm?schema=public" },
     },
   ]);
   assert.match(logs.join("\n"), /Using existing APP_USERNAME=existing-owner/);

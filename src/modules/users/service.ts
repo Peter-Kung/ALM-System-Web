@@ -165,6 +165,7 @@ export async function updateManagedUser(
 
     const updatedUser = await transactionRepository.update(user.id, {
       role: hasRoleUpdate ? nextRole : undefined,
+      status: hasActiveUpdate ? (nextIsActive ? "ACTIVE" : "DISABLED") : undefined,
       isActive: hasActiveUpdate ? nextIsActive : undefined,
       sessionVersion: isDeactivation ? { increment: 1 } : undefined,
     });

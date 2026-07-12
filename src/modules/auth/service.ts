@@ -81,6 +81,7 @@ async function backfillLegacyOwner(
     username: env.fixedUsername,
     passwordHash,
     role: "ADMIN",
+    status: "ACTIVE",
     isActive: true,
   });
 }
@@ -117,6 +118,7 @@ async function ensureFixedOwner(
     return repository.update(existingOwner.id, {
       passwordHash: await hashPassword(fixedPassword),
       role: "ADMIN",
+      status: "ACTIVE",
       isActive: true,
     });
   }
@@ -125,6 +127,7 @@ async function ensureFixedOwner(
     return repository.update(firstUser.id, {
       passwordHash: await hashPassword(fixedPassword),
       role: "ADMIN",
+      status: "ACTIVE",
       isActive: true,
     });
   }
@@ -134,7 +137,9 @@ async function ensureFixedOwner(
       username: env.fixedUsername,
       passwordHash: await hashPassword(fixedPassword),
       role: "ADMIN",
+      status: "ACTIVE",
       isActive: true,
+      sessionVersion: 1,
     });
   }
 
@@ -374,6 +379,7 @@ export async function completeSelfManagedPassword(
     }
 
     return authRepository.update(actionLink.userId, {
+      status: input.tokenType === "ACCOUNT_ACTIVATION" ? "ACTIVE" : undefined,
       isActive: input.tokenType === "ACCOUNT_ACTIVATION" ? true : undefined,
       passwordHash: await hashPassword(input.password),
       sessionVersion:

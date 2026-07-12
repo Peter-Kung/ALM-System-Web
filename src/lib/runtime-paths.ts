@@ -21,6 +21,9 @@ type RuntimePathEnvironment = Partial<
   >
 >;
 
+const DEFAULT_POSTGRESQL_URL =
+  "postgresql://postgres:postgres@127.0.0.1:5432/alm_system_web?schema=public";
+
 function defaultStorageRoot(environment: RuntimePathEnvironment) {
   return environment.NODE_ENV === "production" ? "/var/lib/alm-system" : ".";
 }
@@ -44,8 +47,8 @@ export function resolveRuntimePaths(
   const storageRoot = environment.ALM_STORAGE_ROOT ?? defaultStorageRoot(environment);
   const dataDir = environment.ALM_DATA_DIR ?? joinStoragePath(storageRoot, "data");
   const defaultDatabaseUrl = shouldUsePersistentDatabaseUrl(environment)
-    ? `file:${path.join(dataDir, "alm-system.db")}`
-    : "file:./dev.db";
+    ? DEFAULT_POSTGRESQL_URL
+    : DEFAULT_POSTGRESQL_URL;
 
   return {
     backupDir: environment.ALM_BACKUP_DIR ?? joinStoragePath(storageRoot, "backups"),
