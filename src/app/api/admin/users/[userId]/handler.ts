@@ -1,4 +1,3 @@
-import { UserRole } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 
 import {
@@ -25,6 +24,8 @@ const defaultDependencies: AdminUserHandlerDependencies = {
   createRepository: createUserManagementRepository,
   requireSession: requireApiSession,
 };
+
+const USER_ROLE_VALUES = ["ADMIN", "USER"] as const;
 
 async function requireAdminSession(dependencies: AdminUserHandlerDependencies) {
   const { response, session } = await dependencies.requireSession();
@@ -64,7 +65,7 @@ export async function updateUserHandler(
 
     const role =
       "role" in payload
-        ? getEnumValue(payload, "role", Object.values(UserRole))
+        ? getEnumValue(payload, "role", USER_ROLE_VALUES)
         : undefined;
     const isActive =
       "isActive" in payload ? getBooleanValue(payload, "isActive") : undefined;

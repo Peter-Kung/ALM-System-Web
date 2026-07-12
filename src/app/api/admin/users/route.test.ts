@@ -409,6 +409,44 @@ test("updateUserHandler updates active status and increments session version", a
   assert.equal(body.user.sessionVersion, 1);
 });
 
+test("updateUserHandler accepts role changes for admin sessions", async () => {
+  const repository = createRepositoryFixture();
+  await repository.create({
+    username: "family",
+    role: "USER",
+    isActive: true,
+  });
+
+  const response = await updateUserHandler(
+    new NextRequest("https://example.test/api/admin/users/user-2", {
+      method: "PATCH",
+      body: JSON.stringify({
+        role: "ADMIN",
+      }),
+    }),
+    "user-2",
+    {
+      createRepository: () => repository,
+      async requireSession() {
+        return {
+          response: null,
+          session: {
+            sub: "admin-user",
+            displayName: null,
+            username: "admin",
+            role: "ADMIN",
+            sessionVersion: 0,
+          },
+        };
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.user.role, "ADMIN");
+});
+
 test("requestUserActivationHandler rejects non-admin sessions", async () => {
   const response = await requestUserActivationHandler("family-user", {
     createRepository: createRepositoryFixture,
