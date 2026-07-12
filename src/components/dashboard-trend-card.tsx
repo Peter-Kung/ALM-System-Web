@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 import { formatDashboardAmount } from "@/components/dashboard-amount-format";
-import type { DashboardTrend, DashboardTrendPoint } from "@/modules/dashboard/service";
+import type { DashboardTrend } from "@/modules/dashboard/service";
 
 const TREND_SERIES = [
   { key: "netWorth", label: "Net worth", color: "#556b3d" },
@@ -24,6 +24,11 @@ const TREND_SERIES = [
 type DashboardTrendCardProps = {
   trend: DashboardTrend | null;
   baseCurrency: string;
+};
+
+type DashboardTrendCardDependencies = {
+  fetcher: typeof fetch;
+  replaceHistory: (selectedDate: string) => void;
 };
 
 type TrendDatum = {
@@ -39,11 +44,90 @@ export function DashboardTrendCard({
   trend,
   baseCurrency,
 }: DashboardTrendCardProps) {
-  if (!trend || trend.visiblePoints.length === 0) {
+  return (
+    <DashboardTrendCardWithDependencies
+      trend={trend}
+      baseCurrency={baseCurrency}
+      fetcher={globalThis.fetch}
+      replaceHistory={replaceDashboardTrendHistory}
+    />
+  );
+}
+
+export function DashboardTrendCardWithDependencies({
+  trend,
+  baseCurrency,
+  fetcher,
+  replaceHistory,
+}: DashboardTrendCardProps & DashboardTrendCardDependencies) {
+  const [currentTrend, setCurrentTrend] = React.useState(trend);
+  const [selectedDateInput, setSelectedDateInput] = React.useState(trend?.selectedDate ?? "");
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const requestIdRef = React.useRef(0);
+  const [isPending, startTransition] = React.useTransition();
+
+  React.useEffect(() => {
+    setCurrentTrend(trend);
+    setSelectedDateInput(trend?.selectedDate ?? "");
+    setErrorMessage(null);
+  }, [trend]);
+
+  const loadTrend = React.useCallback(
+    async (value: string) => {
+      if (!currentTrend || !value || value === currentTrend.selectedDate) {
+        return;
+      }
+
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
+      setSelectedDateInput(value);
+      setErrorMessage(null);
+
+      try {
+        const response = await fetcher(
+          `/api/dashboard/trend?trendDate=${encodeURIComponent(value)}`,
+        );
+
+        if (!response.ok) {
+          throw new Error("Trend request failed.");
+        }
+
+        const payload = (await response.json()) as { trend: DashboardTrend | null };
+
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        if (!payload.trend) {
+          setSelectedDateInput(currentTrend.selectedDate);
+          setErrorMessage("Unable to update the selected trend date right now.");
+          return;
+        }
+
+        const nextTrend = payload.trend;
+
+        startTransition(() => {
+          setCurrentTrend(nextTrend);
+          setSelectedDateInput(nextTrend.selectedDate);
+          replaceHistory(nextTrend.selectedDate);
+        });
+      } catch {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        setSelectedDateInput(currentTrend.selectedDate);
+        setErrorMessage("Unable to update the selected trend date right now.");
+      }
+    },
+    [currentTrend, fetcher, replaceHistory],
+  );
+
+  if (!currentTrend || currentTrend.visiblePoints.length === 0) {
     return null;
   }
 
-  const chartData = trend.visiblePoints.map((point) => ({
+  const chartData = currentTrend.visiblePoints.map((point) => ({
     date: point.date,
     shortDate: formatShortDate(point.date),
     netWorth: Number(point.netWorth),
@@ -53,13 +137,13 @@ export function DashboardTrendCard({
   }));
   const latestPoint = chartData[chartData.length - 1];
   const axisLayout = getDashboardTrendAxisLayout();
-  const previousDate = trend.previousDate;
+  const previousDate = currentTrend.previousDate;
   const nextDate =
-    trend.selectedDate < trend.latestSelectableDate
-      ? addUtcCalendarDays(trend.selectedDate, 1)
+    currentTrend.selectedDate < currentTrend.latestSelectableDate
+      ? addUtcCalendarDays(currentTrend.selectedDate, 1)
       : null;
-  const selectedShortDate = formatShortDate(trend.selectedDate);
-  const latestShortDate = formatShortDate(trend.latestSelectableDate);
+  const selectedShortDate = formatShortDate(currentTrend.selectedDate);
+  const latestShortDate = formatShortDate(currentTrend.latestSelectableDate);
 
   return (
     <article className="resource-card stack dashboard-trend-card">
@@ -72,21 +156,39 @@ export function DashboardTrendCard({
           </p>
         </div>
         <div className="dashboard-trend-controls" aria-label="Trend date controls">
-          <TrendDateButton direction="previous" targetDate={previousDate} />
+          <TrendDateButton
+            direction="previous"
+            pending={isPending}
+            targetDate={previousDate}
+            onSelect={loadTrend}
+          />
           <label className="dashboard-date-picker">
             <span className="visually-hidden">Trend start date</span>
             <input
               type="date"
               name="trendDate"
-              min={trend.firstSelectableDate}
-              max={trend.latestSelectableDate}
-              defaultValue={trend.selectedDate}
-              onChange={(event) => navigateToTrendDate(event.currentTarget.value)}
+              min={currentTrend.firstSelectableDate}
+              max={currentTrend.latestSelectableDate}
+              value={selectedDateInput}
+              disabled={isPending}
+              onInput={(event) => {
+                void loadTrend(event.currentTarget.value);
+              }}
             />
           </label>
-          <TrendDateButton direction="next" targetDate={nextDate} />
+          <TrendDateButton
+            direction="next"
+            pending={isPending}
+            targetDate={nextDate}
+            onSelect={loadTrend}
+          />
         </div>
       </div>
+      {errorMessage ? (
+        <p className="muted" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
 
       <div className="dashboard-trend-layout">
         <div className="dashboard-trend-chart">
@@ -180,10 +282,17 @@ export function DashboardTrendCard({
 
 type TrendDateButtonProps = {
   direction: "previous" | "next";
+  onSelect: (value: string) => Promise<void>;
+  pending: boolean;
   targetDate: string | null;
 };
 
-function TrendDateButton({ direction, targetDate }: TrendDateButtonProps) {
+function TrendDateButton({
+  direction,
+  onSelect,
+  pending,
+  targetDate,
+}: TrendDateButtonProps) {
   const label = direction === "previous" ? "Previous day" : "Next day";
   const icon = direction === "previous" ? "<" : ">";
 
@@ -191,11 +300,11 @@ function TrendDateButton({ direction, targetDate }: TrendDateButtonProps) {
     <button
       type="button"
       className="dashboard-trend-arrow"
-      disabled={!targetDate}
+      disabled={!targetDate || pending}
       aria-label={label}
       onClick={() => {
         if (targetDate) {
-          navigateToTrendDate(targetDate);
+          void onSelect(targetDate);
         }
       }}
     >
@@ -230,8 +339,7 @@ function TrendTooltip({
       <div className="stack">
         {payload.map((entry) => (
           <span key={entry.name}>
-            {entry.name}:{" "}
-            {formatDashboardAmount(Number(entry.value ?? 0), baseCurrency)}
+            {entry.name}: {formatDashboardAmount(Number(entry.value ?? 0), baseCurrency)}
           </span>
         ))}
       </div>
@@ -257,12 +365,13 @@ function addUtcCalendarDays(value: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
-function navigateToTrendDate(value: string) {
+function replaceDashboardTrendHistory(value: string) {
   if (!value) {
     return;
   }
 
   const url = new URL("/dashboard", globalThis.location?.origin ?? "http://localhost");
   url.searchParams.set("trendDate", value);
-  globalThis.location.assign(`${url.pathname}${url.search}`);
+  const history = globalThis.history ?? globalThis.window?.history;
+  history?.replaceState?.(null, "", `${url.pathname}${url.search}`);
 }

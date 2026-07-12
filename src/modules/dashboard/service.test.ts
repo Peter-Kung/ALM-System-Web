@@ -12,7 +12,11 @@ import {
   SnapshotStatus,
 } from "@prisma/client";
 
-import { buildDashboardSummary, createDashboardSummaryForUser } from "@/modules/dashboard";
+import {
+  buildDashboardSummary,
+  createDashboardSummaryForUser,
+  createDashboardTrendForUser,
+} from "@/modules/dashboard";
 
 function decimal(value: string) {
   return new Prisma.Decimal(value);
@@ -154,6 +158,55 @@ test("createDashboardSummaryForUser reads snapshots only for the signed-in user"
   assert.deepEqual(requestedUserIds.sort(), ["latest:user-b:1", "trend:user-b"]);
   assert.equal(summary.latestSnapshot?.id, "snapshot-user-b");
   assert.equal(summary.sidebarSummary.netWorth, "800.00");
+});
+
+test("createDashboardTrendForUser normalizes the selected date without rebuilding the full summary", async () => {
+  const trend = await createDashboardTrendForUser(
+    "user-b",
+    { selectedDate: "2026-02-31" },
+    {
+      snapshotRepository: {
+        async listByUser() {
+          return [
+            createSnapshot({
+              id: "snapshot-user-b",
+              userId: "user-b",
+              snapshotAt: new Date("2026-03-02T00:00:00.000Z"),
+              createdAt: new Date("2026-03-02T00:00:00.000Z"),
+            }),
+          ];
+        },
+        async listTrendByUser() {
+          return [
+            createSnapshot({
+              id: "snapshot-1",
+              userId: "user-b",
+              snapshotAt: new Date("2026-03-01T00:00:00.000Z"),
+              createdAt: new Date("2026-03-01T00:00:00.000Z"),
+            }),
+            createSnapshot({
+              id: "snapshot-2",
+              userId: "user-b",
+              snapshotAt: new Date("2026-03-02T00:00:00.000Z"),
+              createdAt: new Date("2026-03-02T00:00:00.000Z"),
+            }),
+          ];
+        },
+      },
+    },
+  );
+
+  assert.equal(trend?.selectedDate, "2026-03-02");
+  assert.deepEqual(trend?.visiblePoints, [
+    {
+      date: "2026-03-02",
+      snapshotAt: "2026-03-02T00:00:00.000Z",
+      netWorth: "800.00",
+      totalAssets: "1200.00",
+      totalLiabilities: "400.00",
+      monthlyDebtPaymentTotal: "120.00",
+    },
+  ]);
 });
 
 test("buildDashboardSummary summarizes the latest snapshot for the homepage", () => {

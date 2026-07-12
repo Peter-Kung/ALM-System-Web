@@ -563,3 +563,29 @@ export async function createDashboardSummaryForUser(
 
   return buildDashboardSummaryFromParts(latestSnapshot, trendSnapshots, options);
 }
+
+export async function createDashboardTrendForUser(
+  userId: string,
+  options: DashboardSummaryOptions = {},
+  repositories: DashboardRepositories = defaultDashboardRepositories,
+) {
+  const [latestSnapshot] = await repositories.snapshotRepository.listByUser(userId, {
+    take: 1,
+  });
+
+  if (!latestSnapshot) {
+    return null;
+  }
+
+  const trendSince = new Date(
+    `${addUtcDays(
+      toDateKey(latestSnapshot.snapshotAt),
+      -(DASHBOARD_TREND_HISTORY_DAYS - 1),
+    )}T00:00:00.000Z`,
+  );
+  const trendSnapshots = await repositories.snapshotRepository.listTrendByUser(userId, {
+    since: trendSince,
+  });
+
+  return buildTrend(buildDailyTrendPoints(trendSnapshots), options);
+}

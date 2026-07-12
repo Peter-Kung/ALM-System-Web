@@ -2,4 +2,8 @@ export const dashboardModule = {
   name: "dashboard",
 };
 
-export { buildDashboardSummary, createDashboardSummaryForUser } from "./service";
+export {
+  buildDashboardSummary,
+  createDashboardSummaryForUser,
+  createDashboardTrendForUser,
+} from "./service";

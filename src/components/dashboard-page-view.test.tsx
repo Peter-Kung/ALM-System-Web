@@ -13,7 +13,13 @@ import type { DashboardSummary } from "@/modules/dashboard/service";
 
 type DomGlobals = Pick<
   typeof globalThis,
-  "document" | "Event" | "HTMLElement" | "localStorage" | "self" | "window"
+  | "document"
+  | "Event"
+  | "HTMLElement"
+  | "HTMLInputElement"
+  | "localStorage"
+  | "self"
+  | "window"
 >;
 
 const reactActGlobal = globalThis as typeof globalThis & {
@@ -28,6 +34,7 @@ function createDashboardDom() {
     document: globalThis.document,
     Event: globalThis.Event,
     HTMLElement: globalThis.HTMLElement,
+    HTMLInputElement: globalThis.HTMLInputElement,
     localStorage: globalThis.localStorage,
     self: globalThis.self,
     window: globalThis.window,
@@ -36,6 +43,7 @@ function createDashboardDom() {
   globalThis.document = dom.window.document;
   globalThis.Event = dom.window.Event;
   globalThis.HTMLElement = dom.window.HTMLElement;
+  globalThis.HTMLInputElement = dom.window.HTMLInputElement;
   globalThis.localStorage = dom.window.localStorage;
   globalThis.self = dom.window as unknown as Window & typeof globalThis;
   globalThis.window = dom.window as unknown as Window & typeof globalThis;
@@ -439,6 +447,209 @@ test("dashboard trend controls remain available when the selected window has one
     /<button type="button" class="dashboard-trend-arrow" disabled="" aria-label="Next day"/,
   );
   assert.match(markup, /value="2026-07-08"/);
+});
+
+test("dashboard trend date picker updates only the trend card without navigation", async () => {
+  const { document, root, restore } = createDashboardDom();
+  const previousFetch = globalThis.fetch;
+  const fetchCalls: string[] = [];
+  const replaceStateCalls: string[] = [];
+  const previousReplaceState = globalThis.window.history.replaceState.bind(globalThis.window.history);
+
+  globalThis.fetch = (async (input) => {
+    fetchCalls.push(String(input));
+
+    return new Response(
+      JSON.stringify({
+        trend: {
+          firstSelectableDate: "2026-07-01",
+          latestSelectableDate: "2026-07-08",
+          defaultSelectedDate: "2026-07-08",
+          selectedDate: "2026-07-02",
+          previousDate: "2026-07-01",
+          netWorthChange: "5.00",
+          totalAssetsChange: "5.00",
+          totalLiabilitiesChange: "0.00",
+          monthlyDebtPaymentChange: "0.00",
+          visiblePoints: [
+            {
+              date: "2026-07-02",
+              snapshotAt: "2026-07-02T00:00:00.000Z",
+              netWorth: "725.00",
+              totalAssets: "1105.00",
+              totalLiabilities: "380.00",
+              monthlyDebtPaymentTotal: "115.00",
+            },
+            {
+              date: "2026-07-08",
+              snapshotAt: "2026-07-08T00:00:00.000Z",
+              netWorth: "800.00",
+              totalAssets: "1200.00",
+              totalLiabilities: "400.00",
+              monthlyDebtPaymentTotal: "120.00",
+            },
+          ],
+        },
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  }) as typeof fetch;
+
+  globalThis.window.history.replaceState = ((data: unknown, unused: string, url?: string | URL | null) => {
+    void data;
+    void unused;
+    replaceStateCalls.push(String(url ?? ""));
+  }) as typeof globalThis.window.history.replaceState;
+
+  try {
+    await act(async () => {
+      root.render(<DashboardPageView dashboard={createDashboardSummary()} />);
+    });
+
+    const trendDateInput = document.querySelector<HTMLInputElement>('input[name="trendDate"]');
+
+    assert.ok(trendDateInput);
+
+    trendDateInput.value = "2026-07-02";
+
+    await act(async () => {
+      trendDateInput.dispatchEvent(new Event("input", { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    assert.deepEqual(fetchCalls, ["/api/dashboard/trend?trendDate=2026-07-02"]);
+    assert.deepEqual(replaceStateCalls, ["/dashboard?trendDate=2026-07-02"]);
+    assert.equal(trendDateInput.value, "2026-07-02");
+    assert.match(document.body.textContent ?? "", /Jul 2 to Jul 8/);
+    assert.match(document.body.textContent ?? "", /Net worth/);
+  } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.window.history.replaceState = previousReplaceState;
+    await unmount(root);
+    restore();
+  }
+});
+
+test("dashboard trend previous and next controls fetch local card updates", async () => {
+  const { document, root, restore } = createDashboardDom();
+  const previousFetch = globalThis.fetch;
+  const previousReplaceState = globalThis.window.history.replaceState.bind(globalThis.window.history);
+  const fetchCalls: string[] = [];
+
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    fetchCalls.push(url);
+    const selectedDate = url.includes("2026-07-02") ? "2026-07-02" : "2026-07-03";
+
+    return new Response(
+      JSON.stringify({
+        trend: {
+          firstSelectableDate: "2026-07-01",
+          latestSelectableDate: "2026-07-08",
+          defaultSelectedDate: "2026-07-08",
+          selectedDate,
+          previousDate: selectedDate === "2026-07-02" ? "2026-07-01" : "2026-07-02",
+          netWorthChange: "5.00",
+          totalAssetsChange: "5.00",
+          totalLiabilitiesChange: "0.00",
+          monthlyDebtPaymentChange: "0.00",
+          visiblePoints: [
+            {
+              date: selectedDate,
+              snapshotAt: `${selectedDate}T00:00:00.000Z`,
+              netWorth: "725.00",
+              totalAssets: "1105.00",
+              totalLiabilities: "380.00",
+              monthlyDebtPaymentTotal: "115.00",
+            },
+            {
+              date: "2026-07-08",
+              snapshotAt: "2026-07-08T00:00:00.000Z",
+              netWorth: "800.00",
+              totalAssets: "1200.00",
+              totalLiabilities: "400.00",
+              monthlyDebtPaymentTotal: "120.00",
+            },
+          ],
+        },
+      }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  }) as typeof fetch;
+
+  globalThis.window.history.replaceState = (() => undefined) as typeof globalThis.window.history.replaceState;
+
+  try {
+    await act(async () => {
+      root.render(
+        <DashboardPageView
+          dashboard={createDashboardSummary({
+            trend: {
+              firstSelectableDate: "2026-07-01",
+              latestSelectableDate: "2026-07-08",
+              defaultSelectedDate: "2026-07-08",
+              selectedDate: "2026-07-03",
+              previousDate: "2026-07-02",
+              netWorthChange: "0.00",
+              totalAssetsChange: "0.00",
+              totalLiabilitiesChange: "0.00",
+              monthlyDebtPaymentChange: "0.00",
+              visiblePoints: [
+                {
+                  date: "2026-07-03",
+                  snapshotAt: "2026-07-03T00:00:00.000Z",
+                  netWorth: "730.00",
+                  totalAssets: "1110.00",
+                  totalLiabilities: "380.00",
+                  monthlyDebtPaymentTotal: "115.00",
+                },
+                {
+                  date: "2026-07-08",
+                  snapshotAt: "2026-07-08T00:00:00.000Z",
+                  netWorth: "800.00",
+                  totalAssets: "1200.00",
+                  totalLiabilities: "400.00",
+                  monthlyDebtPaymentTotal: "120.00",
+                },
+              ],
+            },
+          })}
+        />,
+      );
+    });
+
+    const buttons = document.querySelectorAll<HTMLButtonElement>(".dashboard-trend-arrow");
+    assert.equal(buttons.length, 2);
+
+    await act(async () => {
+      buttons[0].click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      buttons[1].click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    assert.deepEqual(fetchCalls, [
+      "/api/dashboard/trend?trendDate=2026-07-02",
+      "/api/dashboard/trend?trendDate=2026-07-03",
+    ]);
+  } finally {
+    globalThis.fetch = previousFetch;
+    globalThis.window.history.replaceState = previousReplaceState;
+    await unmount(root);
+    restore();
+  }
 });
 
 test("dashboard trend card renders the selected visible window only", () => {
