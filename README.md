@@ -82,32 +82,20 @@ This repo requires `DATABASE_URL` to be set for Prisma commands and app
 runtime. In development, the app falls back to these defaults when you do not
 set environment variables:
 
-- Setup token: `setup-token`
-- Legacy fixed username: `owner`
-- Legacy fixed password: `change-me`
+- Fixed username: `owner`
+- Fixed password: `change-me`
 - Session secret: `development-session-secret-change-me`
 
-You can override bootstrap and runtime configuration with:
+You can override runtime configuration with:
 
-- `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` for the configured first admin
-- `APP_SETUP_TOKEN` for the one-time setup route
+- `APP_USERNAME` and `APP_PASSWORD` for the fixed sign-in account
 - `SESSION_SECRET` and `DATABASE_URL` for runtime configuration
 
-Set `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` together. If only one is set,
-the app raises a configuration error instead of falling back to setup.
-
-If `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` are set and the database has
-no users yet, the app creates that first administrator before normal sign-in.
-Those values also support the legacy fixed-credential upgrade path when the
-existing owner record still has no stored password hash. In other cases, use
-the existing database-backed accounts as-is. If no configured administrator is
-present and the database still has no users, complete first-run setup at
-`/setup` instead.
-
-The legacy `APP_USERNAME` and `APP_PASSWORD` values remain compatibility inputs
-only when an existing deployment upgrades from the older fixed-credential
-single-user model. After a user has a stored password hash, normal sign-ins
-always use the database-backed user credentials.
+On first run, the app materializes the fixed owner account from
+`APP_USERNAME` and `APP_PASSWORD`. If an older owner record exists without a
+stored password hash, the login path upgrades that record in place. After the
+owner account has a stored password hash, sign-in continues through `/login`
+with the same fixed username and the stored password.
 
 ## Self-hosted Docker deployment
 
@@ -134,11 +122,7 @@ deployment flow.
 
 1. Open `http://localhost:3000`.
 2. The app redirects protected routes to `/login`.
-3. If `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` are configured before the
-   first user exists, sign in at `/login` with that administrator account.
-4. If no users exist and no configured administrator is bootstrapped, open
-   `/setup`, enter the setup token, and create the first administrator account.
-5. After setup completes, sign in at `/login` with a database-backed user.
+3. Sign in at `/login` with `APP_USERNAME` and `APP_PASSWORD`.
 
 After a successful sign-in, the app redirects to the dashboard.
 

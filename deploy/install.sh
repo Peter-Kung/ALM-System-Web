@@ -44,6 +44,12 @@ random_secret() {
   head -c 48 /dev/urandom | base64 | tr -d '\n'
 }
 
+read_env_value() {
+  local file="$1"
+  local key="$2"
+  awk -F= -v key="$key" '$1 == key {print substr($0, index($0, "=") + 1)}' "$file" | tail -n 1
+}
+
 install_compose_template() {
   local destination="$1"
   local local_template="${script_dir}/docker-compose.yml"
@@ -103,11 +109,14 @@ chmod 0700 "$deploy_root" "$deploy_root"/{data,backups,update-state,uploads}
 
 if [ ! -f "${deploy_root}/.env" ]; then
   session_secret="$(random_secret)"
-  setup_token="$(random_secret)"
+  owner_username="${APP_USERNAME:-owner}"
+  owner_password="${APP_PASSWORD:-$(random_secret)}"
+  generated_owner_password="$owner_password"
 
   cat >"${deploy_root}/.env" <<EOF
 APP_NAME=ALM System
-APP_SETUP_TOKEN=${setup_token}
+APP_USERNAME=${owner_username}
+APP_PASSWORD=${owner_password}
 SESSION_SECRET=${session_secret}
 ALM_DEPLOY_ROOT=${deploy_root}
 ALM_HTTP_PORT=${http_port}
@@ -119,9 +128,8 @@ EOF
 
   chmod 0600 "${deploy_root}/.env"
 else
-  setup_token="$(awk -F= '$1 == "APP_SETUP_TOKEN" {print substr($0, index($0, "=") + 1)}' "${deploy_root}/.env" | tail -n 1)"
-  http_port="$(awk -F= '$1 == "ALM_HTTP_PORT" {print substr($0, index($0, "=") + 1)}' "${deploy_root}/.env" | tail -n 1)"
-  http_bind="$(awk -F= '$1 == "ALM_HTTP_BIND" {print substr($0, index($0, "=") + 1)}' "${deploy_root}/.env" | tail -n 1)"
+  http_port="$(read_env_value "${deploy_root}/.env" "ALM_HTTP_PORT")"
+  http_bind="$(read_env_value "${deploy_root}/.env" "ALM_HTTP_BIND")"
   http_port="${http_port:-3000}"
   http_bind="${http_bind:-127.0.0.1}"
 fi
@@ -146,9 +154,13 @@ for _ in $(seq 1 60); do
   if curl -fsS "$health_url" >/dev/null; then
     echo "ALM System is running at http://${health_host}:${http_port}"
     echo "Deployment root: ${deploy_root}"
-    if [ -n "${setup_token:-}" ]; then
-      echo "First-run setup token: ${setup_token}"
-      echo "Save this token, then complete setup at http://${health_host}:${http_port}/setup"
+    if [ -n "${generated_owner_password:-}" ]; then
+      echo "Owner username: ${owner_username}"
+      echo "Owner password: ${generated_owner_password}"
+      echo "This password was written to ${deploy_root}/.env."
+    else
+      echo "Sign in with the existing database-backed owner credentials."
+      echo "If you want a fixed owner bootstrap for a future empty database, add APP_USERNAME and APP_PASSWORD to ${deploy_root}/.env."
     fi
     exit 0
   fi

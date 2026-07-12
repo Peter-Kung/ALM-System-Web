@@ -4,19 +4,11 @@ The ALM System is a private multi-user net worth workspace. It stores editable
 master data for accounts, holdings, liabilities, and prices per signed-in user,
 then turns those inputs into immutable valuation snapshots.
 
-When the database has no users, the app first checks for configured
-`APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` values. If they are present, the
-app creates that first administrator automatically and normal authentication
-continues through `/login`. Those values also support the legacy
-fixed-credential upgrade path when the existing owner record still has no
-stored password hash. Otherwise, the app allows only the `/setup`
-initialization flow. The setup route requires the configured setup token and
-creates the first administrator account. After that account exists, the setup
-route is no longer available.
-
-`APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` must be configured together. If
-only one is set, the app raises a configuration error until the deployment
-settings are fixed.
+The active login flow uses the fixed `APP_USERNAME` and `APP_PASSWORD`
+configuration through `/login`. When the database has no users, the app creates
+that owner account automatically. If an older owner record exists without a
+stored password hash, the login path upgrades that record in place and keeps
+the fixed username active.
 
 User accounts are stored in the database with password hashes, an active flag,
 roles, and a session version. `ADMIN` users can manage users from
@@ -38,11 +30,8 @@ deactivation are not implemented the same way in the current product:
 - Password reset requests currently return a pending self-managed onboarding
   response instead of changing the password directly.
 
-Environment values `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` configure the
-bootstrap administrator only for an empty database or the supported legacy
-owner-upgrade path. Legacy `APP_USERNAME` and `APP_PASSWORD` remain
-compatibility inputs only for upgrade paths from the older fixed-login
-single-user model.
+The `/setup` route is not part of the active runtime flow. The fixed owner
+account is the supported sign-in path.
 
 The dashboard reports from the latest saved snapshot. It does not recalculate
 live market values on page load. This keeps the homepage stable and aligned

@@ -5,7 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { formatDashboardAmount } from "@/components/dashboard-amount-format";
 import { WorkspaceMutationBoundary } from "@/components/workspace-mutation-boundary";
 import { getSessionFromCookies } from "@/lib/auth/session";
-import { isBootstrapRequired, validateSessionPayload } from "@/modules/auth";
+import { ensureConfiguredAdministrator, validateSessionPayload } from "@/modules/auth";
 import { createAuthRepository } from "@/modules/auth/repository";
 import { createDashboardSummaryForUser } from "@/modules/dashboard";
 import type { DashboardSidebarSummary } from "@/modules/dashboard/service";
@@ -17,9 +17,7 @@ export default async function AuthenticatedLayout({
 }) {
   const session = await getSessionFromCookies();
   const repository = createAuthRepository();
-  if (await isBootstrapRequired(repository)) {
-    redirect("/setup");
-  }
+  await ensureConfiguredAdministrator(repository);
 
   if (!session) {
     redirect("/login");

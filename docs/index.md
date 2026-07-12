@@ -7,8 +7,6 @@
 
 Multi-user behavior summary:
 
-- Database-backed users sign in through `/login`.
-- If `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD` are unset and no users
-  exist, first-run setup uses `/setup` with the setup token to create the first
-  administrator account.
+- The active login flow uses the fixed `APP_USERNAME` and `APP_PASSWORD`
+  account through `/login`.
 - Administrators manage users from `/manage/users`.

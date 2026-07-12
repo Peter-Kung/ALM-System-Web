@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import { Prisma } from "@prisma/client";
 import type { UserActionTokenType } from "@prisma/client";
 
-import { env, getConfiguredAdminCredentials, requireFixedPassword } from "@/lib/env";
+import { env, requireFixedPassword } from "@/lib/env";
 import type { SessionPayload } from "@/lib/auth/token";
 import { RepositoryValidationError } from "@/lib/repository-utils";
 import {
@@ -85,30 +85,54 @@ async function backfillLegacyOwner(
   });
 }
 
-export async function ensureConfiguredAdministrator(
+async function ensureFixedOwner(
   repository: AuthRepository = createAuthRepository(),
 ) {
-  const configuredAdmin = getConfiguredAdminCredentials();
-  if (!configuredAdmin) {
-    return null;
+  const existingOwner = await repository.findByUsername(env.fixedUsername);
+  if (existingOwner) {
+    if (existingOwner.passwordHash) {
+      return existingOwner;
+    }
   }
 
   const firstUser = await repository.findFirstUser();
+  if (firstUser?.passwordHash) {
+    return firstUser;
+  }
+
+  const hashedUser = await repository.findFirstUserWithPasswordHash();
+  if (hashedUser) {
+    return hashedUser;
+  }
+
+  const fixedPassword = requireFixedPassword();
   if (!firstUser) {
     return repository.createFirstAdministrator({
-      username: configuredAdmin.username,
-      passwordHash: await hashPassword(configuredAdmin.password),
+      username: env.fixedUsername,
+      passwordHash: await hashPassword(fixedPassword),
     });
   }
 
-  if (
-    !firstUser.passwordHash &&
-    (firstUser.username === env.fixedUsername ||
-      firstUser.username === configuredAdmin.username)
-  ) {
+  if (existingOwner) {
+    return repository.update(existingOwner.id, {
+      passwordHash: await hashPassword(fixedPassword),
+      role: "ADMIN",
+      isActive: true,
+    });
+  }
+
+  if (!firstUser.passwordHash && firstUser.username === env.fixedUsername) {
     return repository.update(firstUser.id, {
-      username: configuredAdmin.username,
-      passwordHash: await hashPassword(configuredAdmin.password),
+      passwordHash: await hashPassword(fixedPassword),
+      role: "ADMIN",
+      isActive: true,
+    });
+  }
+
+  if (!existingOwner) {
+    return repository.create({
+      username: env.fixedUsername,
+      passwordHash: await hashPassword(fixedPassword),
       role: "ADMIN",
       isActive: true,
     });
@@ -117,12 +141,18 @@ export async function ensureConfiguredAdministrator(
   return firstUser;
 }
 
+export async function ensureConfiguredAdministrator(
+  repository: AuthRepository = createAuthRepository(),
+) {
+  return ensureFixedOwner(repository);
+}
+
 export async function validateOwnerLogin(
   username: string,
   password: string,
   repository: AuthRepository = createAuthRepository(),
 ) {
-  await ensureConfiguredAdministrator(repository);
+  await ensureFixedOwner(repository);
   const trimmedUsername = username.trim();
   const user = await repository.findByUsername(trimmedUsername);
 
@@ -214,8 +244,8 @@ function createInvalidLinkError() {
 export async function isBootstrapRequired(
   repository: AuthRepository = createAuthRepository(),
 ) {
-  await ensureConfiguredAdministrator(repository);
-  return (await repository.findFirstUser()) === null;
+  await ensureFixedOwner(repository);
+  return false;
 }
 
 export async function createFirstAdministrator(

@@ -39,9 +39,10 @@ front of the app before exposing it to another host. To publish the container on
 all host interfaces, set `ALM_HTTP_BIND=0.0.0.0` only after the host has the
 required network controls.
 
-When the install succeeds, open the setup page shown by the installer and enter
-the printed setup token. The setup flow creates the first administrator account.
-After that account exists, the setup page redirects to normal authentication.
+When the install succeeds, sign in at `/login`. Fresh installs print the
+generated `APP_USERNAME` and `APP_PASSWORD` credentials and write them to
+`.env`. Existing deployments keep their current database-backed owner
+credentials unless you later add `APP_USERNAME` and `APP_PASSWORD` yourself.
 
 ## Persistent Files
 
@@ -67,7 +68,7 @@ uploaded files.
 
 | Path | Purpose |
 | --- | --- |
-| `.env` | Runtime settings, setup token, session secret, image, port, and container name. |
+| `.env` | Runtime settings, fixed owner credentials, session secret, image, port, and container name. |
 | `docker-compose.yml` | Compose definition for the single application container. |
 | `update.sh` | Host-side update, rollback, and update-status command. |
 | `data/` | SQLite database storage. |

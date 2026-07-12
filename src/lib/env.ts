@@ -19,11 +19,25 @@ function getOptionalSecret(name: string, developmentFallback?: string) {
   return null;
 }
 
+function normalizeFixedUsername(value: string | undefined) {
+  const username = (value ?? "owner").trim();
+  if (!username) {
+    throw new Error("APP_USERNAME must not be empty.");
+  }
+
+  if (username.length < 3 || username.length > 32 || !/^[A-Za-z0-9._-]+$/.test(username)) {
+    throw new Error(
+      "APP_USERNAME must be 3 to 32 characters and use only letters, numbers, '.', '_', and '-'.",
+    );
+  }
+
+  return username;
+}
+
 export const env = {
   appName: process.env.APP_NAME ?? "ALM System",
-  fixedUsername: process.env.APP_USERNAME ?? "owner",
+  fixedUsername: normalizeFixedUsername(process.env.APP_USERNAME),
   fixedPassword: getOptionalSecret("APP_PASSWORD", "change-me"),
-  setupToken: getOptionalSecret("APP_SETUP_TOKEN", "setup-token"),
   sessionSecret: getOptionalSecret(
     "SESSION_SECRET",
     "development-session-secret-change-me",
@@ -31,23 +45,6 @@ export const env = {
   databaseUrl: runtimePaths.databaseUrl,
   runtimePaths,
 };
-
-export function getConfiguredAdminCredentials() {
-  const username = process.env.APP_ADMIN_USERNAME?.trim();
-  const password = process.env.APP_ADMIN_PASSWORD;
-
-  if (!username && !password) {
-    return null;
-  }
-
-  if (!username || !password) {
-    throw new Error(
-      "APP_ADMIN_USERNAME and APP_ADMIN_PASSWORD must be configured together.",
-    );
-  }
-
-  return { username, password };
-}
 
 function requireConfiguredValue(value: string | null, envName: string) {
   if (!value) {
@@ -59,10 +56,6 @@ function requireConfiguredValue(value: string | null, envName: string) {
 
 export function requireFixedPassword() {
   return requireConfiguredValue(env.fixedPassword, "APP_PASSWORD");
-}
-
-export function requireSetupToken() {
-  return requireConfiguredValue(env.setupToken, "APP_SETUP_TOKEN");
 }
 
 export function requireSessionSecret() {

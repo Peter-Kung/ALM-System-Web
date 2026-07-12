@@ -246,21 +246,11 @@ function createRepositoryFixture(
   };
 }
 
-test("isBootstrapRequired is true only while the database has no users", async () => {
+test("isBootstrapRequired auto-materializes the fixed owner and stays false", async () => {
   const repository = createRepositoryFixture();
 
-  assert.equal(await isBootstrapRequired(repository), true);
-
-  await createFirstAdministrator(
-    {
-      username: "owner",
-      password: "new-password",
-      confirmPassword: "new-password",
-    },
-    repository,
-  );
-
   assert.equal(await isBootstrapRequired(repository), false);
+  assert.ok(await validateOwnerLogin("owner", "change-me", repository));
 });
 
 test("createFirstAdministrator creates the only first-run admin account", async () => {
@@ -284,127 +274,85 @@ test("createFirstAdministrator creates the only first-run admin account", async 
   assert.equal(await validateOwnerLogin("owner", "new-password", repository), user);
 });
 
-test("ensureConfiguredAdministrator creates the first active admin from deployment config", async () => {
-  const originalUsername = process.env.APP_ADMIN_USERNAME;
-  const originalPassword = process.env.APP_ADMIN_PASSWORD;
-  process.env.APP_ADMIN_USERNAME = "configured-admin";
-  process.env.APP_ADMIN_PASSWORD = "configured-password";
+test("ensureConfiguredAdministrator creates the fixed owner when no users exist", async () => {
+  const repository = createRepositoryFixture();
 
-  try {
-    const repository = createRepositoryFixture();
+  const user = await ensureConfiguredAdministrator(repository);
 
-    const user = await ensureConfiguredAdministrator(repository);
-
-    assert.ok(user);
-    assert.equal(user.username, "configured-admin");
-    assert.equal(user.role, "ADMIN");
-    assert.equal(user.isActive, true);
-    assert.equal(user.sessionVersion, 0);
-    assert.ok(user.passwordHash);
-    assert.equal(
-      await validateOwnerLogin("configured-admin", "configured-password", repository),
-      user,
-    );
-  } finally {
-    if (originalUsername === undefined) {
-      delete process.env.APP_ADMIN_USERNAME;
-    } else {
-      process.env.APP_ADMIN_USERNAME = originalUsername;
-    }
-
-    if (originalPassword === undefined) {
-      delete process.env.APP_ADMIN_PASSWORD;
-    } else {
-      process.env.APP_ADMIN_PASSWORD = originalPassword;
-    }
-  }
+  assert.ok(user);
+  assert.equal(user.username, "owner");
+  assert.equal(user.role, "ADMIN");
+  assert.equal(user.isActive, true);
+  assert.equal(user.sessionVersion, 0);
+  assert.ok(user.passwordHash);
+  assert.equal(await validateOwnerLogin("owner", "change-me", repository), user);
 });
 
 test("ensureConfiguredAdministrator upgrades an existing owner without changing its id", async () => {
-  const originalUsername = process.env.APP_ADMIN_USERNAME;
-  const originalPassword = process.env.APP_ADMIN_PASSWORD;
-  process.env.APP_ADMIN_USERNAME = "configured-admin";
-  process.env.APP_ADMIN_PASSWORD = "configured-password";
+  const repository = createRepositoryFixture([
+    {
+      id: "owner-user",
+      username: "owner",
+      passwordHash: null,
+      role: "USER",
+      isActive: false,
+    },
+  ]);
 
-  try {
-    const repository = createRepositoryFixture([
-      {
-        id: "owner-user",
-        username: "owner",
-        passwordHash: null,
-        role: "USER",
-        isActive: false,
-      },
-    ]);
+  const user = await ensureConfiguredAdministrator(repository);
 
-    const user = await ensureConfiguredAdministrator(repository);
-
-    assert.ok(user);
-    assert.equal(user.id, "owner-user");
-    assert.equal(user.username, "configured-admin");
-    assert.equal(user.role, "ADMIN");
-    assert.equal(user.isActive, true);
-    assert.ok(user.passwordHash);
-    assert.equal(
-      await validateOwnerLogin("configured-admin", "configured-password", repository),
-      user,
-    );
-  } finally {
-    if (originalUsername === undefined) {
-      delete process.env.APP_ADMIN_USERNAME;
-    } else {
-      process.env.APP_ADMIN_USERNAME = originalUsername;
-    }
-
-    if (originalPassword === undefined) {
-      delete process.env.APP_ADMIN_PASSWORD;
-    } else {
-      process.env.APP_ADMIN_PASSWORD = originalPassword;
-    }
-  }
+  assert.ok(user);
+  assert.equal(user.id, "owner-user");
+  assert.equal(user.username, "owner");
+  assert.equal(user.role, "ADMIN");
+  assert.equal(user.isActive, true);
+  assert.ok(user.passwordHash);
+  assert.equal(await validateOwnerLogin("owner", "change-me", repository), user);
 });
 
-test("ensureConfiguredAdministrator does not reactivate an existing configured admin", async () => {
-  const originalUsername = process.env.APP_ADMIN_USERNAME;
-  const originalPassword = process.env.APP_ADMIN_PASSWORD;
-  process.env.APP_ADMIN_USERNAME = "configured-admin";
-  process.env.APP_ADMIN_PASSWORD = "configured-password";
+test("ensureConfiguredAdministrator leaves an existing hashed owner unchanged", async () => {
+  const existingHash = await hashPassword("existing-password");
+  const repository = createRepositoryFixture([
+    {
+      id: "admin-user",
+      username: "owner",
+      passwordHash: existingHash,
+      role: "ADMIN",
+      isActive: false,
+    },
+  ]);
 
-  try {
-    const existingHash = await hashPassword("existing-password");
-    const repository = createRepositoryFixture([
-      {
-        id: "admin-user",
-        username: "configured-admin",
-        passwordHash: existingHash,
-        role: "ADMIN",
-        isActive: false,
-      },
-    ]);
+  const user = await ensureConfiguredAdministrator(repository);
 
-    const user = await ensureConfiguredAdministrator(repository);
+  assert.ok(user);
+  assert.equal(user.id, "admin-user");
+  assert.equal(user.isActive, false);
+  assert.equal(user.passwordHash, existingHash);
+  assert.equal(await validateOwnerLogin("owner", "existing-password", repository), null);
+});
 
-    assert.ok(user);
-    assert.equal(user.id, "admin-user");
-    assert.equal(user.isActive, false);
-    assert.equal(user.passwordHash, existingHash);
-    assert.equal(
-      await validateOwnerLogin("configured-admin", "existing-password", repository),
-      null,
-    );
-  } finally {
-    if (originalUsername === undefined) {
-      delete process.env.APP_ADMIN_USERNAME;
-    } else {
-      process.env.APP_ADMIN_USERNAME = originalUsername;
-    }
+test("ensureConfiguredAdministrator preserves a later hashed user when the first user is legacy and unhashed", async () => {
+  const laterHash = await hashPassword("later-password");
+  const repository = createRepositoryFixture([
+    {
+      id: "legacy-owner",
+      username: "owner",
+      passwordHash: null,
+    },
+    {
+      id: "hashed-user",
+      username: "family-admin",
+      passwordHash: laterHash,
+      createdAt: new Date("2026-07-02T00:00:00Z"),
+    },
+  ]);
 
-    if (originalPassword === undefined) {
-      delete process.env.APP_ADMIN_PASSWORD;
-    } else {
-      process.env.APP_ADMIN_PASSWORD = originalPassword;
-    }
-  }
+  const user = await ensureConfiguredAdministrator(repository);
+
+  assert.equal(user.id, "hashed-user");
+  assert.equal(user.username, "family-admin");
+  assert.ok(user.passwordHash);
+  assert.ok(await validateOwnerLogin("family-admin", "later-password", repository));
 });
 
 test("validateOwnerLogin accepts the stored password hash once database-backed auth is active", async () => {
@@ -438,14 +386,14 @@ test("validateOwnerLogin rejects inactive users", async () => {
   assert.equal(await validateOwnerLogin("owner", "new-password", repository), null);
 });
 
-test("validateOwnerLogin rejects fixed credentials in an empty database", async () => {
+test("validateOwnerLogin bootstraps the fixed owner in an empty database", async () => {
   const emptyRepository = createRepositoryFixture();
 
-  assert.equal(
-    await validateOwnerLogin("owner", "change-me", emptyRepository),
-    null,
-  );
+  const user = await validateOwnerLogin("owner", "change-me", emptyRepository);
 
+  assert.ok(user);
+  assert.equal(user.username, "owner");
+  assert.ok(user.passwordHash);
 });
 
 test("validateOwnerLogin backfills an existing legacy owner with no password hash", async () => {
