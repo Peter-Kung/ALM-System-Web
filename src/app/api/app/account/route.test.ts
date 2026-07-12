@@ -168,6 +168,9 @@ test("patchAccountHandler clears the session after a successful password update"
 test("patchAccountHandler keeps the session after a successful display-name update", async () => {
   let cleared = false;
   const repository: AuthRepository = {
+    async compareAndSetLoginState(id, _expected, data) {
+      return this.update(id, data);
+    },
     async findById() {
       return createAuthUser();
     },
