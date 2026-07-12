@@ -5,8 +5,8 @@ import {
   AssetPriceSourceType,
   AssetType,
   LiabilityType,
-  UserRole,
 } from "@prisma/client";
+import type { UserRole } from "@prisma/client";
 import React from "react";
 import { FormEvent, useEffect, useState } from "react";
 
@@ -176,6 +176,11 @@ type UserFormState = {
   isActive: boolean;
 };
 
+const USER_ROLE = {
+  ADMIN: "ADMIN",
+  USER: "USER",
+} as const satisfies Record<UserRole, UserRole>;
+
 const emptyAccountForm: AccountFormState = {
   name: "",
   institutionName: "",
@@ -229,7 +234,7 @@ const emptyManualPriceForm: ManualPriceFormState = {
 const emptyUserForm: UserFormState = {
   displayName: "",
   username: "",
-  role: UserRole.USER,
+  role: USER_ROLE.USER,
   isActive: true,
 };
 
@@ -449,7 +454,7 @@ function UsersManager() {
   }
 
   const activeAdminCount = users.filter(
-    (user) => user.role === UserRole.ADMIN && user.isActive,
+    (user) => user.role === USER_ROLE.ADMIN && user.isActive,
   ).length;
 
   return (
@@ -500,8 +505,8 @@ function UsersManager() {
                 setForm({ ...form, role: event.target.value as UserRole })
               }
             >
-              <option value={UserRole.USER}>User</option>
-              <option value={UserRole.ADMIN}>Admin</option>
+              <option value={USER_ROLE.USER}>User</option>
+              <option value={USER_ROLE.ADMIN}>Admin</option>
             </select>
           </label>
           <label className="toggle-field">
@@ -671,8 +676,8 @@ function UserRecordCard({
             disabled={isUpdating}
             onChange={(event) => onRoleChange(event.target.value as UserRole)}
           >
-            <option value={UserRole.USER}>User</option>
-            <option value={UserRole.ADMIN}>Admin</option>
+            <option value={USER_ROLE.USER}>User</option>
+            <option value={USER_ROLE.ADMIN}>Admin</option>
           </select>
         </label>
         <label className="toggle-field">
